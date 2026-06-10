@@ -1,0 +1,6 @@
+{
+  "name": "متجر ريكسون الرقمي R3XON",
+  "description": "منصة متكاملة وفخمة لبيع الاشتراكات والخدمات الرقمية والحسابات المميزة بواجهة مستخدم غاية في الجمال والسهولة وتوافقية كاملة.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,72 @@
+@import url('https://fonts.googleapis.com/css2=Tajawal:wght@300;400;500;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Tajawal", ui-sans-serif, system-ui, sans-serif;
+  --color-brand-blue: #38bdf8;
+  --color-brand-cyan: #22d3ee;
+  --color-brand-gold: #d4af37;
+  --color-dark-bg: #050614;
+}
+
+body {
+  font-family: 'Tajawal', var(--font-sans);
+  background-color: var(--color-dark-bg);
+  color: #ffffff;
+  overflow-x: hidden;
+}
+
+/* Glassmorphism Classes */
+.glass-card {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+}
+
+.glass-button {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-button:hover {
+  background: rgba(34, 211, 238, 0.1);
+  border-color: rgba(34, 211, 238, 0.3);
+  color: #22d3ee;
+  box-shadow: 0 4px 15px rgba(34, 211, 238, 0.15);
+}
+
+.glow-cyan {
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.8), 0 0 20px rgba(56, 189, 248, 0.4);
+}
+
+.glow-gold {
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.25);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Animations */
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.glow-pulse {
+  animation: pulseGlow 3s infinite;
+}
