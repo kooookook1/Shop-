@@ -15,10 +15,13 @@ interface AdminDashboardProps {
   products: Product[];
   users: User[];
   transactions: Transaction[];
+  orders: Order[];
   onAddProduct: (product: any) => void;
   onEditProduct: (product: Product) => void;
   onDeleteProduct: (id: string) => void;
   onBackToStore: () => void;
+  onRefreshUsers?: () => Promise<void>;
+  onRefreshOrders?: () => Promise<void>;
 }
 
 interface Category {
@@ -64,6 +67,8 @@ interface SiteSettings {
   socialTwitter: string;
   socialTelegram: string;
   socialWhatsapp: string;
+  asiacellPhone?: string;
+  asiacellRate?: number;
 }
 
 interface AuditLog {
@@ -89,7 +94,8 @@ export default function AdminDashboard({
   onAddProduct, 
   onEditProduct, 
   onDeleteProduct, 
-  onBackToStore 
+  onBackToStore,
+  onRefreshUsers
 }: AdminDashboardProps) {
   
   // Custom Dashboard Tabs configuration
@@ -206,6 +212,9 @@ export default function AdminDashboard({
   const [prodIsFeatured, setProdIsFeatured] = useState(false);
   const [prodIsBestSeller, setProdIsBestSeller] = useState(false);
   const [prodTagText, setProdTagText] = useState('');
+  const [prodProductType, setProdProductType] = useState('standard');
+  const [prodKeys, setProdKeys] = useState('');
+  const [prodRequirePlayerId, setProdRequirePlayerId] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
 
   // 3. Coupon Form fields
@@ -238,14 +247,17 @@ export default function AdminDashboard({
   const [userIdState, setUserIdState] = useState('');
   const [userNameState, setUserNameState] = useState('');
   const [userEmailState, setUserEmailState] = useState('');
-  const [userBalanceState, setUserBalanceState] = useState('450');
+  const [userBalanceState, setUserBalanceState] = useState('0');
   const [userStatusState, setUserStatusState] = useState<'VIP' | 'نشط' | 'محظور'>('نشط');
+  const [userPasswordState, setUserPasswordState] = useState('');
 
   // 7. Order credentials adjustment fields
   const [orderTargetId, setOrderTargetId] = useState('');
   const [orderCredUsername, setOrderCredUsername] = useState('');
   const [orderCredPassword, setOrderCredPassword] = useState('');
   const [orderCredCode, setOrderCredCode] = useState('');
+  const [orderCredPlayerId, setOrderCredPlayerId] = useState('');
+  const [orderCredKeys, setOrderCredKeys] = useState<string[]>([]);
   const [orderStatusField, setOrderStatusField] = useState('تم تسليم الطلب');
 
   // Search Filter values
@@ -259,6 +271,53 @@ export default function AdminDashboard({
   const showToast = (text: string) => {
     setToastText(text);
     setTimeout(() => setToastText(null), 3000);
+  };
+
+  // Custom interactive dialog popup to replace standard blocked `prompt` and `confirm` calls in Google AI Studio cross-origin iframe.
+  const [customPromptDialog, setCustomPromptDialog] = useState<{
+    isOpen: boolean;
+    type: 'prompt' | 'confirm';
+    title: string;
+    message: string;
+    defaultValue?: string;
+    okText?: string;
+    cancelText?: string;
+    onResolve: (value: { confirmed: boolean; value?: string }) => void;
+  } | null>(null);
+
+  const customConfirm = (message: string, title = 'تأكيد الإجراء'): Promise<boolean> => {
+    return new Promise((resolve) => {
+      setCustomPromptDialog({
+        isOpen: true,
+        type: 'confirm',
+        title,
+        message,
+        okText: 'تأكيد الموافقة',
+        cancelText: 'إلغاء',
+        onResolve: (res) => {
+          setCustomPromptDialog(null);
+          resolve(res.confirmed);
+        }
+      });
+    });
+  };
+
+  const customPrompt = (message: string, defaultValue = '', title = 'إدخال بيانات'): Promise<string | null> => {
+    return new Promise((resolve) => {
+      setCustomPromptDialog({
+        isOpen: true,
+        type: 'prompt',
+        title,
+        message,
+        defaultValue,
+        okText: 'متابعة',
+        cancelText: 'إلغاء',
+        onResolve: (res) => {
+          setCustomPromptDialog(null);
+          resolve(res.confirmed ? (res.value ?? '') : null);
+        }
+      });
+    });
   };
 
   // Core Math computations for Analytics
@@ -284,11 +343,11 @@ export default function AdminDashboard({
   const handleOpenCategoryModal = (c: Category | null = null) => {
     if (c) {
       setEditingCategory(c);
-      setCatId(c.id);
-      setCatName(c.name);
+      setCatId(c.id || '');
+      setCatName(c.name || '');
       setCatOrder(c.orderIndex?.toString() || '');
-      setCatLayout(c.viewLayout);
-      setCatIcon(c.imageOrIcon);
+      setCatLayout(c.viewLayout || 'vertical');
+      setCatIcon(c.imageOrIcon || 'Shield');
       setCatIsActive(c.isActive === 1);
       setCatIsHidden(c.isHidden === 1);
     } else {
@@ -345,7 +404,7 @@ export default function AdminDashboard({
   };
 
   const deleteCategory = async (id: string, name: string) => {
-    if (!confirm(`هل أنت متأكد من رغبتك في حذف القسم "${name}" بالكامل؟ سيؤثر هذا على تصفية المنتجات.`)) return;
+    if (!await customConfirm(`هل أنت متأكد من رغبتك في حذف القسم "${name}" بالكامل؟ سيؤثر هذا على تصفية المنتجات.`)) return;
     try {
       const res = await fetch(`/api/categories/${id}`, { method: 'DELETE' });
       if (res.ok) {
@@ -400,21 +459,24 @@ export default function AdminDashboard({
   const handleOpenProductModal = (p: Product | null = null) => {
     if (p) {
       setEditingProduct(p);
-      setProdId(p.id);
-      setProdName(p.name);
-      setProdCategory(p.category);
+      setProdId(p.id || '');
+      setProdName(p.name || '');
+      setProdCategory(p.category || 'accounts');
       setProdPrice(p.price?.toString() || '0');
-      setProdOriginalPrice((p.originalPrice || p.price * 1.3).toFixed(2));
-      setProdPeriod(p.period);
+      setProdOriginalPrice((p.originalPrice || (p.price ? p.price * 1.3 : 0)).toFixed(2));
+      setProdPeriod(p.period || '');
       setProdStock(p.stock?.toString() || '0');
       setProdImageUrl(p.imageUrl || '');
-      setProdExtraImages(Array.isArray((p as any).extraImages) ? (p as any).extraImages.join(', ') : '');
+      setProdExtraImages(Array.isArray(p.images) ? p.images.join(', ') : '');
       setProdVideoUrl((p as any).videoUrl || '');
-      setProdFeatures(p.features.join('\n'));
+      setProdFeatures(Array.isArray(p.features) ? p.features.join('\n') : '');
       setProdCommission((p.commission_rate || 15)?.toString() || '15');
-      setProdIsFeatured((p as any).isFeatured);
-      setProdIsBestSeller((p as any).isBestSeller);
+      setProdIsFeatured(!!(p as any).isFeatured);
+      setProdIsBestSeller(!!(p as any).isBestSeller);
       setProdTagText((p as any).tagText || '');
+      setProdProductType((p as any).productType || 'standard');
+      setProdKeys(Array.isArray((p as any).keys) ? (p as any).keys.join('\n') : '');
+      setProdRequirePlayerId(!!(p as any).requirePlayerId);
     } else {
       setEditingProduct(null);
       setProdId(`prod-${Date.now()}`);
@@ -432,6 +494,9 @@ export default function AdminDashboard({
       setProdIsFeatured(false);
       setProdIsBestSeller(false);
       setProdTagText('');
+      setProdProductType('standard');
+      setProdKeys('');
+      setProdRequirePlayerId(false);
     }
     setActiveModal('product');
   };
@@ -446,13 +511,16 @@ export default function AdminDashboard({
     setProdPeriod(p.period);
     setProdStock(p.stock?.toString() || '0');
     setProdImageUrl(p.imageUrl || '');
-    setProdExtraImages(Array.isArray((p as any).extraImages) ? (p as any).extraImages.join(', ') : '');
+    setProdExtraImages(Array.isArray(p.images) ? p.images.join(', ') : '');
     setProdVideoUrl((p as any).videoUrl || '');
     setProdFeatures(p.features.join('\n'));
     setProdCommission((p.commission_rate || 15)?.toString() || '15');
     setProdIsFeatured((p as any).isFeatured);
     setProdIsBestSeller((p as any).isBestSeller);
     setProdTagText((p as any).tagText || '');
+    setProdProductType((p as any).productType || 'standard');
+    setProdKeys((p as any).keys ? (p as any).keys.join('\n') : '');
+    setProdRequirePlayerId(Boolean((p as any).requirePlayerId));
     setActiveModal('product');
     showToast("تم نسخ المنتج بسرعة! عدل حفظ البيانات للحفظ 📄");
   };
@@ -462,7 +530,8 @@ export default function AdminDashboard({
     setIsLoading(true);
     const featuresList = prodFeatures.split('\n').filter(f => f.trim() !== '');
     const exImagesList = prodExtraImages.split(',').map(img => img.trim()).filter(img => img.length > 0);
-    
+    const keysList = prodKeys.split('\n').filter(k => k.trim() !== '');
+
     const body = {
       id: prodId,
       name: prodName,
@@ -475,17 +544,20 @@ export default function AdminDashboard({
       iconName: 'box',
       features: featuresList,
       commission_rate: parseFloat(prodCommission) || 15,
-      extraImages: exImagesList,
+      images: exImagesList,    // Updated from extraImages
       videoUrl: prodVideoUrl,
       isFeatured: prodIsFeatured ? 1 : 0,
       isBestSeller: prodIsBestSeller ? 1 : 0,
-      tagText: prodTagText
+      tagText: prodTagText,
+      productType: prodProductType,
+      keys: keysList,
+      requirePlayerId: prodRequirePlayerId ? 1 : 0
     };
 
     if (editingProduct) {
       await onEditProduct(body as any);
       showToast("تم تعديل بيانات المنتج وحفظها بنجاح 💎");
-      await writeLog("تعديل منتج", `تم حفظ التعديلات على المنتج: ${prodName} بـ سعر ${prodPrice} ر.س`);
+      await writeLog("تعديل منتج", `تم حفظ التعديلات على المنتج: ${prodName} بـ سعر ${prodPrice} د.ع`);
     } else {
       await onAddProduct(body);
       showToast("تم إنشاء المنتج الرقمي وإضافته للمتجر بنجاح 🛒");
@@ -498,7 +570,7 @@ export default function AdminDashboard({
   };
 
   const deleteProductItem = async (id: string, name: string) => {
-    if (!confirm(`هل أنت متأكد تماماً من رغبتك في مسح المنتج ${name} بشكل نهائي من قاعدة البيانات؟`)) return;
+    if (!await customConfirm(`هل أنت متأكد تماماً من رغبتك في مسح المنتج ${name} بشكل نهائي من قاعدة البيانات؟`)) return;
     try {
       await onDeleteProduct(id);
       showToast("تمت إزالة المنتج نهائياً🗑️");
@@ -532,13 +604,13 @@ export default function AdminDashboard({
   const handleOpenCouponModal = (c: Coupon | null = null) => {
     if (c) {
       setEditingCoupon(c);
-      setCoupId(c.id);
-      setCoupCode(c.code);
-      setCoupType(c.type);
+      setCoupId(c.id || '');
+      setCoupCode(c.code || '');
+      setCoupType(c.type || 'percent');
       setCoupValue(c.value?.toString() || '0');
-      setCoupExpiry(c.expiryDate);
+      setCoupExpiry(c.expiryDate || '2027-12-31');
       setCoupMaxUses(c.maxUses?.toString() || '1');
-      setCoupAssignedTo(c.assignedTo);
+      setCoupAssignedTo(c.assignedTo || 'all');
       setCoupIsActive(c.isActive === 1);
     } else {
       setEditingCoupon(null);
@@ -582,7 +654,7 @@ export default function AdminDashboard({
         showToast(editingCoupon ? "تم تحديث كوبون الخصم 🔖" : "تم إنشاء الكوبون الجديد بنجاح 🎊");
         await writeLog(
           editingCoupon ? "تعديل كوبون" : "صناعة كوبون",
-          `اسم الكوبون (${coupCode}) بقيمة ${coupValue}${coupType === 'percent' ? '%' : 'ر.س'}`
+          `اسم الكوبون (${coupCode}) بقيمة ${coupValue}${coupType === 'percent' ? '%' : 'د.ع'}`
         );
         setActiveModal(null);
       } else {
@@ -596,7 +668,7 @@ export default function AdminDashboard({
   };
 
   const deleteCoupon = async (id: string, code: string) => {
-    if (!confirm(`هل تود التخلص ومسح كود الخصم "${code}" ؟`)) return;
+    if (!await customConfirm(`هل تود التخلص ومسح كود الخصم "${code}" ؟`)) return;
     try {
       const res = await fetch(`/api/coupons/${id}`, { method: 'DELETE' });
       if (res.ok) {
@@ -614,6 +686,8 @@ export default function AdminDashboard({
     setOrderCredUsername(order.credentials?.username || '');
     setOrderCredPassword(order.credentials?.password || '');
     setOrderCredCode(order.credentials?.code || '');
+    setOrderCredPlayerId(order.credentials?.playerId || '');
+    setOrderCredKeys(order.credentials?.keys || []);
     setOrderStatusField(order.status || 'تم تسليم الطلب');
     setActiveModal('orderCredentials');
   };
@@ -624,7 +698,9 @@ export default function AdminDashboard({
     const credentials = {
       username: orderCredUsername,
       password: orderCredPassword,
-      code: orderCredCode
+      code: orderCredCode,
+      playerId: orderCredPlayerId,
+      keys: orderCredKeys
     };
 
     try {
@@ -647,7 +723,7 @@ export default function AdminDashboard({
   };
 
   const handleDeleteOrder = async (id: string) => {
-    if (!confirm("هل أنت متأكد من رغبتك في شطب وإلغاء هذا الطلب من السجل؟")) return;
+    if (!await customConfirm("هل أنت متأكد من رغبتك في شطب وإلغاء هذا الطلب من السجل؟")) return;
     try {
       const res = await fetch(`/api/orders/${id}`, { method: 'DELETE' });
       if (res.ok) {
@@ -717,11 +793,11 @@ export default function AdminDashboard({
   const handleOpenBannerModal = (b: Banner | null = null) => {
     if (b) {
       setEditingBanner(b);
-      setBannerId(b.id);
-      setBannerTitle(b.title);
-      setBannerImg(b.imageUrl);
-      setBannerVid(b.videoUrl);
-      setBannerLink(b.linkTo);
+      setBannerId(b.id || '');
+      setBannerTitle(b.title || '');
+      setBannerImg(b.imageUrl || '');
+      setBannerVid(b.videoUrl || '');
+      setBannerLink(b.linkTo || '');
       setBannerActive(b.isActive === 1);
       setBannerOrder(b.orderIndex?.toString() || '0');
     } else {
@@ -774,7 +850,7 @@ export default function AdminDashboard({
   };
 
   const deleteBanner = async (id: string, title: string) => {
-    if (!confirm(`هل تود إزالة شريحة البنر "${title}"؟`)) return;
+    if (!await customConfirm(`هل تود إزالة شريحة البنر "${title}"؟`)) return;
     try {
       const res = await fetch(`/api/banners/${id}`, { method: 'DELETE' });
       if (res.ok) {
@@ -795,11 +871,13 @@ export default function AdminDashboard({
   const [socialTwitter, setSocialTwitter] = useState('https://twitter.com');
   const [socialTelegram, setSocialTelegram] = useState('https://t.me');
   const [socialWhatsapp, setSocialWhatsapp] = useState('https://wa.me');
+  const [asiacellPhone, setAsiacellPhone] = useState('07700000000');
+  const [asiacellRate, setAsiacellRate] = useState(350);
 
   // Load current settings into form when tab opens
   useEffect(() => {
     if (activeTab === 'settings' && siteSettings) {
-      setSiteName(siteSettings.siteName);
+      setSiteName(siteSettings.siteName || '');
       setLogoUrl(siteSettings.logoUrl || '');
       setPrimaryColor(siteSettings.primaryColor || '#22d3ee');
       setTermsPageText(siteSettings.termsPage || '');
@@ -807,6 +885,8 @@ export default function AdminDashboard({
       setSocialTwitter(siteSettings.socialTwitter || '');
       setSocialTelegram(siteSettings.socialTelegram || '');
       setSocialWhatsapp(siteSettings.socialWhatsapp || '');
+      setAsiacellPhone(siteSettings.asiacellPhone || '07700000000');
+      setAsiacellRate(siteSettings.asiacellRate || 350);
     }
   }, [activeTab, siteSettings]);
 
@@ -822,7 +902,9 @@ export default function AdminDashboard({
       privacyPage: privacyPageText,
       socialTwitter,
       socialTelegram,
-      socialWhatsapp
+      socialWhatsapp,
+      asiacellPhone,
+      asiacellRate
     };
 
     try {
@@ -847,11 +929,12 @@ export default function AdminDashboard({
 
   // USER MANAGEMENT
   const handleOpenUserEditModal = (u: User) => {
-    setUserIdState(u.id);
-    setUserNameState(u.name);
-    setUserEmailState(u.email);
+    setUserIdState(u.id || '');
+    setUserNameState(u.name || '');
+    setUserEmailState(u.email || '');
     setUserBalanceState(u.balance?.toString() || '0');
-    setUserStatusState(u.status);
+    setUserStatusState(u.status || 'نشط');
+    setUserPasswordState(u.password || '');
     setActiveModal('userEdit');
   };
 
@@ -862,7 +945,8 @@ export default function AdminDashboard({
       name: userNameState,
       email: userEmailState,
       balance: parseFloat(userBalanceState) || 0,
-      status: userStatusState
+      status: userStatusState,
+      password: userPasswordState
     };
 
     try {
@@ -872,9 +956,11 @@ export default function AdminDashboard({
         body: JSON.stringify(body)
       });
       if (res.ok) {
-        showToast("تم تعديل رصيد وحالة العميل بنجاح 👥");
-        await writeLog("تعديل بيانات عميل", `رصيد (${userNameState}) أصبح ${userBalanceState} ر.س وحالته (${userStatusState})`);
+        showToast("تم تعديل بيانات ورصيد العميل بنجاح 👥");
+        await writeLog("تعديل بيانات عميل", `رصيد (${userNameState}) أصبح ${userBalanceState} د.ع وحالته (${userStatusState})`);
         setActiveModal(null);
+        if (onRefreshUsers) await onRefreshUsers();
+        loadDynamicData();
       }
     } catch (e) {
       console.error(e);
@@ -884,15 +970,86 @@ export default function AdminDashboard({
   };
 
   const handleDeleteUser = async (id: string, name: string) => {
-    if (!confirm(`هل تود فعلاً طرد وحذف العميل "${name}" بالكامل من مخدمات المتجر؟`)) return;
+    if (!await customConfirm(`هل تود فعلاً طرد وحذف العميل "${name}" بالكامل من مخدمات المتجر؟`)) return;
     try {
       const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
       if (res.ok) {
         showToast("تم حذف العميل بنجاح 🗑️");
         await writeLog("حذف عميل نهائياً", `إقصاء وتطهير حساب: ${name}`);
+        if (onRefreshUsers) await onRefreshUsers();
+        loadDynamicData();
       }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleQuickBalanceChange = async (userId: string, amount: number, type: 'add' | 'deduct', userName: string) => {
+    setIsLoading(true);
+    try {
+      const actualAmount = type === 'add' ? amount : -amount;
+      const res = await fetch(`/api/users/${userId}/balance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: actualAmount })
+      });
+      if (res.ok) {
+        showToast(type === 'add' 
+          ? `تمت إضافة ${amount} د.ع لرصيد العميل ${userName} بنجاح! 💰` 
+          : `تم خصم ${amount} د.ع من رصيد العميل ${userName} بنجاح! 💸`
+        );
+        await writeLog(
+          type === 'add' ? "شحن رصيد سريع" : "خصم رصيد سريع", 
+          `العميل: ${userName} (ID: ${userId})، المبلغ: ${amount} د.ع`
+        );
+        if (onRefreshUsers) await onRefreshUsers();
+        await loadDynamicData();
+      } else {
+        showToast("فشل تحديث رصيد العميل");
+      }
+    } catch (e) {
+      console.error(e);
+      showToast("حدث خطأ في النظام");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleQuickStatusChange = async (userId: string, nextStatus: string, userName: string) => {
+    setIsLoading(true);
+    const userToEdit = users.find(u => u.id === userId);
+    if (!userToEdit) {
+      showToast("المستخدم غير موجود");
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const body = {
+        name: userToEdit.name,
+        email: userToEdit.email,
+        balance: userToEdit.balance,
+        status: nextStatus as any,
+        password: userToEdit.password
+      };
+      const res = await fetch(`/api/users/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (res.ok) {
+        showToast(`تم تغيير حالة العميل ${userName} إلى (${nextStatus}) بنجاح! 👥`);
+        await writeLog("تعديل رتبة/حالة عميل", `اسم العميل: ${userName}، الحالة الجديدة: ${nextStatus}`);
+        if (onRefreshUsers) await onRefreshUsers();
+        await loadDynamicData();
+      } else {
+        showToast("فشل تغيير حالة العميل");
+      }
+    } catch (e) {
+      console.error(e);
+      showToast("حدث خطأ في النظام");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -979,9 +1136,10 @@ export default function AdminDashboard({
 
   const filteredUsers = users.filter(u => {
     const term = (userFilterText || '').toLowerCase();
+    const uId = (u && u.id || '').toLowerCase();
     const uName = (u && u.name || '').toLowerCase();
     const uEmail = (u && u.email || '').toLowerCase();
-    return uName.includes(term) || uEmail.includes(term);
+    return uName.includes(term) || uEmail.includes(term) || uId.includes(term);
   });
 
   const filteredOrders = fullOrders.filter(o => {
@@ -1006,6 +1164,70 @@ export default function AdminDashboard({
             <Sparkles size={16} className="animate-spin" />
             <span>{toastText}</span>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Custom Promise-based Prompt/Confirm Modal (Solves blocked default alerts in iframe sandbox) */}
+      <AnimatePresence>
+        {customPromptDialog && customPromptDialog.isOpen && (
+          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4" dir="rtl">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-slate-900 border border-white/10 rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4 text-right"
+            >
+              <div className="flex items-center gap-3 border-b border-white/5 pb-3 justify-end flex-row-reverse">
+                <HelpCircle size={18} className="text-cyan-400" />
+                <h3 className="text-sm font-black text-white">{customPromptDialog.title}</h3>
+              </div>
+              
+              <div className="space-y-3">
+                <p className="text-xs text-gray-300 leading-relaxed font-sans pre-wrap whitespace-pre-wrap">{customPromptDialog.message}</p>
+                
+                {customPromptDialog.type === 'prompt' && (
+                  <input
+                    id="custom-prompt-input"
+                    type="text"
+                    defaultValue={customPromptDialog.defaultValue}
+                    placeholder="اكتب القيمة هنا..."
+                    className="w-full bg-slate-950/80 border border-white/10 rounded-2xl px-4 py-3 text-xs text-white outline-none focus:border-cyan-400 select-all font-sans text-right"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const inputEl = document.getElementById('custom-prompt-input') as HTMLInputElement;
+                        customPromptDialog.onResolve({ confirmed: true, value: inputEl?.value });
+                      } else if (e.key === 'Escape') {
+                        customPromptDialog.onResolve({ confirmed: false });
+                      }
+                    }}
+                  />
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 flex-row-reverse">
+                <button
+                  onClick={() => {
+                    if (customPromptDialog.type === 'prompt') {
+                      const inputEl = document.getElementById('custom-prompt-input') as HTMLInputElement;
+                      customPromptDialog.onResolve({ confirmed: true, value: inputEl?.value });
+                    } else {
+                      customPromptDialog.onResolve({ confirmed: true });
+                    }
+                  }}
+                  className="px-5 py-2.5 bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-black rounded-xl text-[11px] scale-100 active:scale-95 transition-all cursor-pointer"
+                >
+                  {customPromptDialog.okText || 'موافق'}
+                </button>
+                <button
+                  onClick={() => customPromptDialog.onResolve({ confirmed: false })}
+                  className="px-4 py-2.5 bg-white/5 border border-white/5 hover:bg-white/10 text-gray-300 rounded-xl text-[11px] font-bold transition-all cursor-pointer"
+                >
+                  {customPromptDialog.cancelText || 'إلغاء'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
@@ -1072,19 +1294,19 @@ export default function AdminDashboard({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="bg-[#1e1b4b]/60 border border-indigo-500/10 p-4 rounded-3xl text-right">
                 <span className="text-[10px] text-indigo-300 font-bold block mb-1">المبيعات الكلية</span>
-                <p className="text-[17px] font-black tracking-tight text-white">{grossIncome.toFixed(2)} ر.س</p>
+                <p className="text-[17px] font-black tracking-tight text-white">{grossIncome.toLocaleString('ar-EG')} د.ع</p>
                 <span className="text-[8px] text-gray-300 mt-1 block">توزيع عوائد وتسويات</span>
               </div>
 
               <div className="bg-[#1c1d1a]/80 border border-green-500/10 p-4 rounded-3xl text-right">
                 <span className="text-[10px] text-emerald-400 font-bold block mb-1">صافي أرباح ريكسون</span>
-                <p className="text-[17px] font-black tracking-tight text-emerald-400">{netCommission.toFixed(2)} ر.س</p>
+                <p className="text-[17px] font-black tracking-tight text-emerald-400">{netCommission.toLocaleString('ar-EG')} د.ع</p>
                 <div className="text-[8px] text-gray-400 mt-1">العمولة المهيأة (%15 كمتوسط)</div>
               </div>
 
               <div className="bg-[#1f2025]/80 border border-amber-500/10 p-4 rounded-3xl text-right">
                 <span className="text-[10px] text-amber-300 font-bold block mb-1">مستحقات الشركاء</span>
-                <p className="text-[17px] font-black tracking-tight text-amber-400">{partnerShares.toFixed(2)} ر.س</p>
+                <p className="text-[17px] font-black tracking-tight text-amber-400">{partnerShares.toLocaleString('ar-EG')} د.ع</p>
                 <span className="text-[8px] text-gray-400 mt-1 block">قابلة للسحب للبنوك</span>
               </div>
 
@@ -1104,19 +1326,19 @@ export default function AdminDashboard({
               
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between items-center py-1">
-                  <span className="font-mono font-bold text-cyan-400">{dailyRev} ر.س</span>
+                  <span className="font-mono font-bold text-cyan-400">{Number(dailyRev).toLocaleString('ar-EG')} د.ع</span>
                   <span className="text-gray-400">الأرباح التقديرية اليومية</span>
                 </div>
                 <div className="w-full bg-white/5 h-1 rounded-full"><div className="bg-cyan-400 h-1 rounded-full" style={{ width: '40%' }}></div></div>
 
                 <div className="flex justify-between items-center py-1">
-                  <span className="font-mono font-bold text-amber-400">{weeklyRev} ر.س</span>
+                  <span className="font-mono font-bold text-amber-400">{Number(weeklyRev).toLocaleString('ar-EG')} د.ع</span>
                   <span className="text-gray-400">الأرباح التقديرية الأسبوعية</span>
                 </div>
                 <div className="w-full bg-white/5 h-1 rounded-full"><div className="bg-amber-400 h-1 rounded-full" style={{ width: '70%' }}></div></div>
 
                 <div className="flex justify-between items-center py-1">
-                  <span className="font-mono font-bold text-emerald-400">{monthlyRev} ر.س</span>
+                  <span className="font-mono font-bold text-emerald-400">{Number(monthlyRev).toLocaleString('ar-EG')} د.ع</span>
                   <span className="text-gray-400">الأرباح التقديرية الشهرية</span>
                 </div>
                 <div className="w-full bg-white/5 h-1 rounded-full"><div className="bg-emerald-400 h-1 rounded-full" style={{ width: '100%' }}></div></div>
@@ -1199,12 +1421,30 @@ export default function AdminDashboard({
                       </button>
                     </div>
 
-                    <div className="text-right">
-                      <p className="text-xs font-bold text-white flex items-center gap-1.5 justify-end">
-                        <span>{cat.name}</span>
-                        {cat.isHidden === 1 && <span className="bg-amber-500/10 text-amber-500 text-[8px] px-1.5 py-0.5 rounded-md">مخفي مؤقتاً</span>}
-                      </p>
-                      <p className="text-[10px] text-gray-400 mt-1">تنسيق عرض: {cat.viewLayout === 'horizontal' ? 'أفقي' : 'عمودي (افتراضي)'}</p>
+                    <div className="text-right flex items-center gap-2.5">
+                      <div>
+                        <p className="text-xs font-bold text-white flex items-center gap-1.5 justify-end">
+                          <span>{cat.name}</span>
+                          {cat.isHidden === 1 && <span className="bg-amber-500/10 text-amber-500 text-[8px] px-1.5 py-0.5 rounded-md">مخفي مؤقتاً</span>}
+                        </p>
+                        <p className="text-[10px] text-gray-400 mt-1">تنسيق عرض: {cat.viewLayout === 'horizontal' ? 'أفقي' : 'عمودي (افتراضي)'}</p>
+                      </div>
+
+                      {/* Thumbnail Category Preview */}
+                      {cat.imageOrIcon && (
+                        cat.imageOrIcon.startsWith('http') || cat.imageOrIcon.startsWith('/') || cat.imageOrIcon.startsWith('data:') ? (
+                          <img 
+                            src={cat.imageOrIcon} 
+                            alt="" 
+                            referrerPolicy="no-referrer"
+                            className="w-8 h-8 rounded-lg object-contain bg-slate-950 border border-white/5 shrink-0" 
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-lg bg-cyan-400/10 text-cyan-400 flex items-center justify-center font-mono text-[9px] font-bold shrink-0 border border-cyan-400/10">
+                            {cat.imageOrIcon.slice(0, 3)}
+                          </div>
+                        )
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1292,8 +1532,8 @@ export default function AdminDashboard({
                     {/* Stock Quick updates and Prices row */}
                     <div className="grid grid-cols-2 bg-slate-950/40 p-2.5 rounded-xl text-[11px] items-center">
                       <div className="text-left font-mono">
-                        <span className="text-white text-xs font-bold">{p.price} ر.س</span>
-                        {p.originalPrice && <span className="text-gray-500 line-through mr-1 text-[9px]">{p.originalPrice} ر.س</span>}
+                        <span className="text-white text-xs font-bold">{p.price.toLocaleString('ar-EG')} د.ع</span>
+                        {p.originalPrice && <span className="text-gray-500 line-through mr-1 text-[9px]">{p.originalPrice.toLocaleString('ar-EG')} د.ع</span>}
                       </div>
 
                       <div className="flex items-center gap-1.5 justify-end">
@@ -1378,7 +1618,7 @@ export default function AdminDashboard({
                     </div>
 
                     <p className="text-[11px] text-gray-300 mt-2">
-                      قيمة الخصم: <span className="text-cyan-400 font-bold">{c.value}{c.type === 'percent' ? '%' : 'ر.س'}</span>
+                      قيمة الخصم: <span className="text-cyan-400 font-bold">{c.value}{c.type === 'percent' ? '%' : 'د.ع'}</span>
                     </p>
                     <p className="text-[9px] text-gray-400 mt-1">
                       الاستخدام: {c.usedCount} من أصل {c.maxUses} استخدام • تاريخ الانتهاء: {c.expiryDate || 'مفتوح'}
@@ -1454,17 +1694,36 @@ export default function AdminDashboard({
                     {/* Delivery content status verification */}
                     <div className="bg-slate-950/40 p-3 rounded-2xl text-right text-[11px] space-y-2">
                       <div className="flex justify-between">
-                        <span className="font-mono text-white font-bold">{ord.price} ر.س</span>
+                        <span className="font-mono text-white font-bold">{Number(ord.price).toLocaleString('ar-EG')} د.ع</span>
                         <span className="text-gray-400">القيمة الإجمالية</span>
                       </div>
 
                       <div className="flex justify-between">
-                        <span className="font-mono text-amber-400">{companyProfit} ر.س (%{ord.commission_rate})</span>
+                        <span className="font-mono text-amber-400">{Number(companyProfit).toLocaleString('ar-EG')} د.ع (%{ord.commission_rate})</span>
                         <span className="text-gray-400">صافي العمولة</span>
                       </div>
 
-                      <div className="border-t border-white/5 pt-2">
+                      <div className="border-t border-white/5 pt-2 space-y-2">
                         <span className="text-gray-400 block mb-1">البيانات الرقمية المسلمة للعميل:</span>
+                        
+                        {ord.credentials?.playerId && (
+                          <div className="bg-slate-900 flex justify-between p-2 rounded-lg text-left font-mono text-[9px] text-amber-400 select-all border border-amber-500/10">
+                            <span>{ord.credentials.playerId}</span>
+                            <span className="text-gray-400">معرف اللاعب المسجل:</span>
+                          </div>
+                        )}
+
+                        {ord.credentials?.keys && ord.credentials.keys.length > 0 && (
+                          <div className="bg-slate-900 space-y-1 p-2 rounded-lg text-left font-mono text-[9px] text-green-400 select-all border border-green-500/10">
+                            {ord.credentials.keys.map((k: string, idx: number) => (
+                              <div key={idx} className="flex justify-between">
+                                <span>{k}</span>
+                                <span className="text-gray-500">#{idx + 1}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
                         {ord.credentials?.code ? (
                           <div className="bg-slate-900 p-2 rounded-lg text-left font-mono text-[9px] text-cyan-400 select-all border border-cyan-500/10">
                             الكود: {ord.credentials.code}
@@ -1474,7 +1733,9 @@ export default function AdminDashboard({
                             <div>البريد: {ord.credentials.username}</div>
                             <div>السر: {ord.credentials.password}</div>
                           </div>
-                        ) : (
+                        ) : null}
+
+                        {!ord.credentials?.code && !ord.credentials?.username && !ord.credentials?.playerId && (!ord.credentials?.keys || ord.credentials?.keys?.length === 0) && (
                           <span className="text-amber-500">لا يوجد بيانات مسجلة حالياً</span>
                         )}
                       </div>
@@ -1509,47 +1770,120 @@ export default function AdminDashboard({
 
             <div className="space-y-2.5">
               {filteredUsers.map((u, idx) => (
-                <div key={u.id || `user-${idx}`} className="bg-slate-900/40 border border-white/5 rounded-2xl p-4 space-y-3">
-                  <div className="flex items-center justify-between gap-3">
+                <div key={u.id || `user-${idx}`} className="bg-slate-900/40 border border-white/5 rounded-3xl p-4.5 space-y-3.5 relative overflow-hidden">
+                  <div className="flex items-center justify-between gap-3 border-b border-white/5 pb-3">
                     
                     {/* Control edits */}
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <button 
                         onClick={() => handleOpenUserEditModal(u)}
-                        className="bg-cyan-400 text-slate-950 text-[10px] font-bold px-3 py-1.5 rounded-xl flex items-center gap-1"
+                        className="bg-cyan-400 text-slate-950 text-[10px] font-bold px-3 py-1.5 rounded-xl flex items-center gap-1 hover:bg-cyan-300 transition-colors"
                       >
                         <Edit size={11} />
-                        <span>تعديل الرصيد</span>
+                        <span>تعديل التفاصيل</span>
                       </button>
                       <button 
                         onClick={() => handleDeleteUser(u.id, u.name)}
-                        className="p-1.5 text-red-500 hover:bg-white/5 rounded-lg"
+                        className="p-1.5 text-red-500 hover:bg-white/5 rounded-xl transition-colors"
+                        title="حذف الحساب بالكامل"
                       >
                         <Trash2 size={12} />
                       </button>
                     </div>
 
-                    {/* Meta info info */}
+                    {/* Meta info */}
                     <div className="flex items-center gap-2.5 text-right">
                       <div>
-                        <h4 className="text-xs font-bold text-white flex items-center gap-1 justify-end">
+                        <h4 className="text-xs font-bold text-white flex items-center gap-1.5 justify-end">
                           <span>{u.name}</span>
-                          <span className={`text-[8px] px-1 rounded-sm ${u.status === 'VIP' ? 'bg-amber-400/20 text-amber-300' : u.status === 'محظور' ? 'bg-red-500/20 text-red-400' : 'bg-white/5 text-gray-400'}`}>
+                          <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded ${u.status === 'VIP' ? 'bg-amber-400/20 text-amber-300' : u.status === 'محظور' ? 'bg-red-500/20 text-red-400' : 'bg-cyan-400/20 text-cyan-300'}`}>
                             {u.status}
                           </span>
                         </h4>
-                        <p className="text-[10px] text-gray-400 mt-0.5">{u.email}</p>
+                        <p className="text-[10px] text-gray-400 mt-1">{u.email}</p>
                       </div>
 
-                      <div className="w-9 h-9 rounded-full bg-cyan-400/10 text-cyan-400 text-center font-black flex items-center justify-center border border-cyan-400/20">
+                      <div className="w-10 h-10 rounded-full bg-cyan-400/10 text-cyan-400 text-center font-black flex items-center justify-center border border-cyan-400/20 shrink-0 select-none">
                         {u.avatarLetter || (u.name ? u.name.charAt(0) : 'ع')}
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-[11px] bg-slate-950/40 px-3 py-2 rounded-xl">
-                    <span className="font-mono text-cyan-400 font-extrabold">{Number(u.balance).toFixed(2)} ر.س</span>
-                    <span className="text-gray-400">الرصيد المشحون بالمحفظة</span>
+                  {/* Balance Display */}
+                  <div className="flex items-center justify-between text-[11px] bg-slate-950/40 px-3 py-2.5 rounded-xl border border-white/5 font-sans">
+                    <span className="font-mono text-cyan-400 font-extrabold text-xs">{Number(u.balance).toLocaleString('ar-EG')} د.ع</span>
+                    <span className="text-gray-400 font-medium">الرصيد المشحون بالمحفظة</span>
+                  </div>
+
+                  {/* Inner Credentials Block */}
+                  <div className="bg-slate-950/60 rounded-xl p-3 space-y-2 border border-white/5 text-[11px] select-all">
+                    <div className="flex justify-between items-center text-[10px] border-b border-white/5 pb-1 select-none">
+                      <span className="text-gray-500 font-mono">RX-{idx + 101}</span>
+                      <span className="text-gray-400 font-bold">المعرف وكلمة السر المدخلة</span>
+                    </div>
+                    <div className="flex justify-between items-center font-sans">
+                      <span className="font-mono text-cyan-400 bg-slate-900 border border-white/5 px-2 py-0.5 rounded select-all whitespace-nowrap text-[10px] tracking-tight">{u.id}</span>
+                      <span className="text-gray-400 select-none">: كود المعرف (ID)</span>
+                    </div>
+                    <div className="flex justify-between items-center font-sans">
+                      <span className="font-mono text-amber-400 bg-slate-900 border border-white/5 px-2 py-0.5 rounded select-all whitespace-nowrap text-[10px]">{u.password || "لا توجد (دخول سريع)"}</span>
+                      <span className="text-gray-400 select-none">: كلمة المرور المدخلة</span>
+                    </div>
+                  </div>
+
+                   {/* Inline Quick Action Panel */}
+                  <div className="flex flex-wrap items-center gap-1.5 justify-end pt-1 select-none">
+                    {/* Add Balance */}
+                    <button
+                      onClick={async () => {
+                        const amtStr = await customPrompt(`أدخل المبلغ المطلوب إضافته (شحن رصيد) للعميل "${u.name}":`, "100");
+                        if (amtStr) {
+                          const amt = parseFloat(amtStr);
+                          if (!isNaN(amt) && amt > 0) {
+                            await handleQuickBalanceChange(u.id, amt, 'add', u.name);
+                          }
+                        }
+                      }}
+                      className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 font-black px-2.5 py-1.5 rounded-lg flex items-center gap-1 text-[10px] transition-colors cursor-pointer"
+                    >
+                      <span>+ شحن رصيد</span>
+                    </button>
+
+                    {/* Deduct Balance */}
+                    <button
+                      onClick={async () => {
+                        const amtStr = await customPrompt(`أدخل المبلغ المطلوب خصمه من محفظة العميل "${u.name}":`, "50");
+                        if (amtStr) {
+                          const amt = parseFloat(amtStr);
+                          if (!isNaN(amt) && amt > 0) {
+                            await handleQuickBalanceChange(u.id, amt, 'deduct', u.name);
+                          }
+                        }
+                      }}
+                      className="bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 font-black px-2.5 py-1.5 rounded-lg flex items-center gap-1 text-[10px] transition-colors cursor-pointer"
+                    >
+                      <span>- خصم رصيد</span>
+                    </button>
+
+                    {/* Status Toggle */}
+                    <button
+                      onClick={async () => {
+                        const nextStatus = u.status === 'محظور' ? 'نشط' : 'محظور';
+                        const msg = nextStatus === 'محظور' 
+                          ? `هل تود فعلاً حظر المستخدم "${u.name}"؟ لن يستطيع التصفح أو استخدام رصيده.` 
+                          : `هل تود إلغاء حظر العميل "${u.name}" وتنشيط حسابه؟`;
+                        if (await customConfirm(msg)) {
+                          await handleQuickStatusChange(u.id, nextStatus, u.name);
+                        }
+                      }}
+                      className={`font-black px-2.5 py-1.5 rounded-lg border text-[10px] transition-colors cursor-pointer ${
+                        u.status === 'محظور'
+                          ? 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/20 text-amber-400'
+                          : 'bg-red-500/10 hover:bg-red-500/20 border-red-500/20 text-red-500'
+                      }`}
+                    >
+                      <span>{u.status === 'محظور' ? '✓ تفعيل الحساب' : '🚫 حظر الحساب'}</span>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1960,7 +2294,7 @@ export default function AdminDashboard({
                   </div>
 
                   {b.imageUrl && (
-                    <img src={b.imageUrl} className="w-full h-24 rounded-xl object-cover" alt="" referrerPolicy="no-referrer" />
+                    <img src={b.imageUrl} className="w-full h-auto max-h-40 rounded-xl object-contain bg-slate-950/40 border border-white/5" alt="" referrerPolicy="no-referrer" />
                   )}
                 </div>
               ))}
@@ -2061,6 +2395,36 @@ export default function AdminDashboard({
                   onChange={(e) => setSocialWhatsapp(e.target.value)}
                   className="bg-slate-950 border border-white/10 rounded-xl text-xxs py-2 px-3 text-left font-mono text-white outline-none w-full"
                 />
+              </div>
+
+              <div className="border-t border-white/5 pt-3.5 space-y-3">
+                <span className="text-[10px] font-bold text-gray-400 block">إعدادات بوابة شحن آسياسيل ومستلم الأموال تلقائياً:</span>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-gray-400 font-bold block">رقم هاتف المستلم (الرقم الذي يستلم رصيد آسياسيل المحول)</label>
+                    <input
+                      type="text"
+                      value={asiacellPhone}
+                      onChange={(e) => setAsiacellPhone(e.target.value)}
+                      placeholder="مثال: 07700000000"
+                      className="bg-slate-950 border border-white/10 rounded-xl text-xs py-2.5 px-3 text-left font-mono text-white outline-none w-full"
+                    />
+                    <p className="text-[9px] text-gray-500">هذا هو رقم هاتف خط آسياسيل الخاص بك كأدمن لتلقي مبالغ الشحن وحركات التحويل من المستخدمين.</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-gray-400 font-bold block">معدل تحويل دينار عراقي للشحن الفوري</label>
+                    <input
+                      type="number"
+                      value={asiacellRate}
+                      onChange={(e) => setAsiacellRate(Number(e.target.value))}
+                      placeholder="350"
+                      className="bg-slate-950 border border-white/10 rounded-xl text-xs py-2.5 px-3 text-left font-mono text-white outline-none w-full"
+                    />
+                    <p className="text-[9px] text-gray-500">القيمة الافتراضية هي 1 (لأن العملة الأساسية للمتجر بالكامل أصبحت بالدينار العراقي د.ع).</p>
+                  </div>
+                </div>
               </div>
 
               <button
@@ -2240,7 +2604,7 @@ export default function AdminDashboard({
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-[10px] text-gray-400">سعر البيع (ر.س)</label>
+                    <label className="text-[10px] text-gray-400">سعر البيع (د.ع)</label>
                     <input
                       type="text"
                       value={prodPrice}
@@ -2250,7 +2614,7 @@ export default function AdminDashboard({
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-gray-400 text-right">السعر قبل الخصم (ر.س)</label>
+                    <label className="text-[10px] text-gray-400 text-right">السعر قبل الخصم (د.ع)</label>
                     <input
                       type="text"
                       value={prodOriginalPrice}
@@ -2297,7 +2661,9 @@ export default function AdminDashboard({
                       value={prodStock}
                       onChange={(e) => setProdStock(e.target.value)}
                       className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-center w-full mt-1 text-white"
+                      disabled={prodProductType === 'auto_keys'}
                     />
+                    {prodProductType === 'auto_keys' && <p className="text-[8px] text-amber-500 mt-1">يتم احتساب المخزون تلقائياً حسب عدد المفاتيح</p>}
                   </div>
                   <div>
                     <label className="text-[10px] text-gray-400">عمولة المتجر (%)</label>
@@ -2308,6 +2674,58 @@ export default function AdminDashboard({
                       className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-center w-full mt-1 text-white"
                     />
                   </div>
+                </div>
+
+                <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5 space-y-3">
+                  <div>
+                    <label className="text-[10px] text-gray-400 font-bold text-amber-400">طريقة التسليم (نوع المنتج)</label>
+                    <select
+                      value={prodProductType}
+                      onChange={(e) => {
+                         setProdProductType(e.target.value);
+                         if (e.target.value === 'manual_id') {
+                           setProdRequirePlayerId(true);
+                         } else {
+                           setProdRequirePlayerId(false);
+                         }
+                      }}
+                      className="bg-slate-950 border border-cyan-400/30 rounded-xl py-2 px-2 text-right w-full mt-1 text-white"
+                    >
+                      <option value="standard">تسليم تلقائي (حسابات عشوائية جاهزة)</option>
+                      <option value="auto_keys">أكواد جاهزة (تسليم مفتاح من المخزون تلقائياً)</option>
+                      <option value="manual_id">شحن يدوي (العميل يزودنا بالـ ID أو رقم الحساب)</option>
+                    </select>
+                  </div>
+
+                  {prodProductType === 'auto_keys' && (
+                    <div className="animate-in fade-in zoom-in-95">
+                      <label className="text-[10px] text-green-400 font-bold">المخزون السري (أضف كود/مفتاح في كل سطر)</label>
+                      <textarea
+                        value={prodKeys}
+                        onChange={(e) => {
+                          setProdKeys(e.target.value);
+                          setProdStock(e.target.value.split('\n').filter(k => k.trim() !== '').length.toString());
+                        }}
+                        rows={4}
+                        placeholder="KEY-123&#10;KEY-456&#10;user:pass"
+                        className="bg-slate-950 border border-green-500/30 rounded-xl py-2 px-3 text-left font-mono w-full mt-1 outline-none text-white focus:border-green-400"
+                        dir="ltr"
+                      />
+                      <p className="text-[10px] text-gray-500 mt-1 text-right">عدد المفاتيح الصالحة: {prodKeys.split('\n').filter(k=>k.trim() !== '').length}</p>
+                    </div>
+                  )}
+
+                  {prodProductType === 'manual_id' && (
+                    <div className="flex items-center justify-end gap-2 mt-2">
+                       <label className="text-xs text-white">إلزام العميل بإدخال الـ ID قبل الشراء</label>
+                       <input 
+                         type="checkbox" 
+                         checked={prodRequirePlayerId} 
+                         onChange={(e) => setProdRequirePlayerId(e.target.checked)}
+                         className="w-4 h-4 rounded text-cyan-500"
+                       />
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -2500,7 +2918,7 @@ export default function AdminDashboard({
                       className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 w-full text-white text-right"
                     >
                       <option value="percent">نسبة مئوية (%)</option>
-                      <option value="flat">مبلغ مالي ثابت (ر.س)</option>
+                      <option value="flat">مبلغ مالي ثابت (د.ع)</option>
                     </select>
                   </div>
                   <div>
@@ -2796,6 +3214,17 @@ export default function AdminDashboard({
                       required
                     />
                   </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-gray-400">كلمة المرور المسجلة (تظهر للتحكم الكامل)</label>
+                  <input
+                    type="text"
+                    value={userPasswordState}
+                    onChange={(e) => setUserPasswordState(e.target.value)}
+                    className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-right text-white w-full font-mono text-xs placeholder-white/20"
+                    placeholder="لا توجد كلمة مرور مسجلة (دخول سريع)"
+                  />
                 </div>
 
                 <button

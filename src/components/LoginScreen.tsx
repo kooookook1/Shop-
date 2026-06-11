@@ -3,7 +3,7 @@ import { Mail, Lock, Sparkles, User } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface LoginScreenProps {
-  onLogin: (userName: string, email: string) => void;
+  onLogin: (userName: string, email: string, password?: string) => void;
 }
 
 export default function LoginScreen({ onLogin }: LoginScreenProps) {
@@ -16,10 +16,10 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
     e.preventDefault();
     if (isRegistering) {
       const name = fullName.trim() || email.split('@')[0] || 'مستشار ريكسون';
-      onLogin(name, email);
+      onLogin(name, email, password);
     } else {
       const fallbackName = email ? email.split('@')[0] : 'أحمد محمد';
-      onLogin(fallbackName, email);
+      onLogin(fallbackName, email, password);
     }
   };
 

@@ -7,12 +7,16 @@ export interface Product {
   period: string; // 'شهر' | 'سنة' | 'عائلي' | 'فردي' | '660UC' | etc.
   stock: number;
   imageUrl?: string;
+  images?: string[]; // Add array of images
   iconName?: string; // Icon identifier
   rating: number;
   reviewsCount: number;
   features: string[];
   gradientClass?: string | null;
   commission_rate?: number; // Store commission % (e.g. 15%)
+  productType?: 'standard' | 'auto_keys' | 'manual_id';
+  keys?: string[]; // Array of keys/codes for 'auto_keys' type
+  requirePlayerId?: boolean;
 }
 
 export interface User {
@@ -23,6 +27,7 @@ export interface User {
   joinDate: string;
   status: 'VIP' | 'نشط' | 'محظور';
   avatarLetter: string;
+  password?: string;
 }
 
 export interface Order {
@@ -36,6 +41,8 @@ export interface Order {
     username?: string;
     password?: string;
     code?: string;
+    keys?: string[];
+    playerId?: string;
   };
   imageUrl?: string;
   commission_rate?: number;
@@ -72,4 +79,5 @@ export interface CartItem {
   product: Product;
   quantity: number;
   selectedPlan: 'monthly' | 'yearly';
+  playerId?: string;
 }

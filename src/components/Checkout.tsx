@@ -61,7 +61,7 @@ export default function Checkout({ cartItems, onRemoveItem, onClearCart, onCompl
       } else {
         const percentEquivalent = Math.min(0.99, Number(coupon.value) / subtotal);
         setPromoDiscount(percentEquivalent);
-        setPromoFeedback(`تم تطبيق كود الخصم الفاخر بنجاح! تم خصم ${coupon.value} ر.س من السلة.`);
+        setPromoFeedback(`تم تطبيق كود الخصم الفاخر بنجاح! تم خصم ${coupon.value} د.ع من السلة.`);
       }
     } catch (err) {
       setPromoFeedback('عذراً، حدث خطأ أثناء تطبيق كود الخصم.');
@@ -146,10 +146,10 @@ export default function Checkout({ cartItems, onRemoveItem, onClearCart, onCompl
                         <p className="text-[10px] text-gray-400">
                           {item.selectedPlan === 'yearly' ? 'اشتراك سنوي شامل' : 'اشتراك شهري مرن'} (الكمية: {item.quantity})
                         </p>
-                        <div className="text-xs font-semibold text-cyan-400 mt-1">{(itemPrice * item.quantity).toFixed(2)} ر.س</div>
+                        <div className="text-xs font-semibold text-cyan-400 mt-1">{(itemPrice * item.quantity).toLocaleString('ar-EG')} د.ع</div>
                       </div>
 
-                      <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center shrink-0 border border-white/5 overflow-hidden">
+                      <div className="w-16 h-16 bg-slate-900 rounded-xl flex items-center justify-center shrink-0 border border-white/5 overflow-hidden">
                         {item.product.imageUrl ? (
                           <img 
                             src={item.product.imageUrl} 
@@ -259,24 +259,24 @@ export default function Checkout({ cartItems, onRemoveItem, onClearCart, onCompl
           {/* REVENUE/PRICE DETAILS */}
           <section className="glass-card rounded-2xl p-4 space-y-3">
             <div className="flex justify-between items-center text-xs text-gray-400">
-              <span className="font-semibold text-white">{subtotal.toFixed(2)} ر.س</span>
+              <span className="font-semibold text-white">{subtotal.toFixed(2)} د.ع</span>
               <span>المجموع الفرعي</span>
             </div>
             
             {appliedPromo && (
               <div className="flex justify-between items-center text-xs text-emerald-400 font-medium">
-                <span className="font-semibold">- {discountVal.toFixed(2)} ر.س</span>
+                <span className="font-semibold">- {discountVal.toFixed(2)} د.ع</span>
                 <span>الخصم (%٣٠)</span>
               </div>
             )}
 
             <div className="flex justify-between items-center text-xs text-gray-400">
-              <span className="font-semibold text-white">{taxVal.toFixed(2)} ر.س</span>
+              <span className="font-semibold text-white">{taxVal.toFixed(2)} د.ع</span>
               <span>الضريبة المضافة (%١٥)</span>
             </div>
 
             <div className="pt-3 border-t border-white/5 flex justify-between items-center">
-              <span className="text-xl font-black text-cyan-400">{totalVal.toFixed(2)} ر.س</span>
+              <span className="text-xl font-black text-cyan-400">{totalVal.toFixed(2)} د.ع</span>
               <span className="text-sm font-bold text-white">إجمالي الحساب</span>
             </div>
           </section>
@@ -295,7 +295,7 @@ export default function Checkout({ cartItems, onRemoveItem, onClearCart, onCompl
               className="w-full bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-extrabold py-4 rounded-2xl text-base shadow-lg shadow-cyan-400/10 hover:brightness-110 flex items-center justify-center gap-2"
             >
               <span>تأكيد الدفع والخصم من المحفظة</span>
-              <span className="text-xs bg-slate-950/20 py-0.5 px-2 rounded-full font-mono">{totalVal.toFixed(2)} ر.س</span>
+              <span className="text-xs bg-slate-950/20 py-0.5 px-2 rounded-full font-mono">{totalVal.toFixed(2)} د.ع</span>
             </motion.button>
           </section>
 

@@ -10,9 +10,20 @@ interface StorefrontProps {
   cartCount: number;
   favoriteIds?: string[];
   onToggleFavorite?: (productId: string) => void;
+  userBalance?: number;
+  onRechargeClick?: () => void;
 }
 
-export default function Storefront({ products, onSelectProduct, onAddToCart, cartCount, favoriteIds = [], onToggleFavorite }: StorefrontProps) {
+export default function Storefront({ 
+  products, 
+  onSelectProduct, 
+  onAddToCart, 
+  cartCount, 
+  favoriteIds = [], 
+  onToggleFavorite,
+  userBalance,
+  onRechargeClick
+}: StorefrontProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -70,6 +81,20 @@ export default function Storefront({ products, onSelectProduct, onAddToCart, car
   };
 
   const renderCategoryIcon = (iconName: string) => {
+    if (!iconName) return <Sparkles size={13} className="text-cyan-400" />;
+    
+    // Check if it is a real image URL
+    if (iconName.startsWith('http') || iconName.startsWith('/') || iconName.startsWith('data:')) {
+      return (
+        <img 
+          src={iconName} 
+          alt="" 
+          referrerPolicy="no-referrer"
+          className="w-5 h-5 rounded-md object-cover border border-white/10 shrink-0" 
+        />
+      );
+    }
+
     switch (iconName) {
       case 'Tv': return <Tv size={13} className="text-cyan-400" />;
       case 'Gamepad2': return <Gamepad2 size={13} className="text-cyan-400" />;
@@ -84,19 +109,36 @@ export default function Storefront({ products, onSelectProduct, onAddToCart, car
       
       {/* HEADER SECTION */}
       <header className="sticky top-0 z-40 bg-[#050614]/80 backdrop-blur-md border-b border-white/5 py-4 px-4 flex justify-between items-center rounded-b-3xl">
-        <div className="flex items-center gap-1">
-          <motion.div 
-            initial={{ rotate: -15, scale: 0.8 }}
-            animate={{ rotate: 0, scale: 1 }}
-            className="text-lg font-black bg-gradient-to-r from-cyan-400 via-blue-200 to-indigo-400 bg-clip-text text-transparent italic tracking-wider select-none"
-          >
-            {siteSettings?.siteName || "R3XON"}
-          </motion.div>
-          <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-ping"></div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <motion.div 
+              initial={{ rotate: -15, scale: 0.8 }}
+              animate={{ rotate: 0, scale: 1 }}
+              className="text-lg font-black bg-gradient-to-r from-cyan-400 via-blue-200 to-indigo-400 bg-clip-text text-transparent italic tracking-wider select-none"
+            >
+              {siteSettings?.siteName || "R3XON"}
+            </motion.div>
+            <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-ping"></div>
+          </div>
+
+          {/* User Balance Header Pill moved exactly next to URL/Logo as requested */}
+          {userBalance !== undefined && onRechargeClick && (
+            <div 
+              onClick={onRechargeClick}
+              className="flex items-center gap-1 bg-amber-400/10 border border-amber-400/30 hover:border-amber-400 px-2 py-0.5 rounded-full cursor-pointer transition-all active:scale-95 shadow-[0_0_8px_rgba(251,191,36,0.2)] font-sans select-none"
+            >
+              <span className="text-[10px] font-black text-amber-300 font-mono tracking-wide">
+                {userBalance.toLocaleString('ar-EG')} د.ع
+              </span>
+              <div className="w-3.5 h-3.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] flex items-center justify-center pb-[1px] shadow-sm pointer-events-none shrink-0 leading-none">
+                +
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Search Bar Interactive */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {isSearchOpen ? (
             <motion.div 
               initial={{ width: 0, opacity: 0 }}
@@ -153,7 +195,7 @@ export default function Storefront({ products, onSelectProduct, onAddToCart, car
                 {slide.imageUrl && (
                   <img 
                     src={slide.imageUrl} 
-                    className="absolute inset-0 w-full h-full object-cover" 
+                    className="absolute inset-0 w-full h-full object-contain bg-slate-950/40" 
                     alt="" 
                     referrerPolicy="no-referrer"
                   />
@@ -166,7 +208,7 @@ export default function Storefront({ products, onSelectProduct, onAddToCart, car
                   </div>
                   <h2 className="text-sm font-black text-white">{slide.title}</h2>
                   {product ? (
-                    <p className="text-[10px] text-cyan-400 font-bold">{product.price} ر.س / {product.period}</p>
+                    <p className="text-[10px] text-cyan-400 font-bold">{product.price.toLocaleString('ar-EG')} د.ع / {product.period}</p>
                   ) : (
                     <p className="text-[10px] text-gray-400">تابع التفاصيل والشراء الفوري فوراً</p>
                   )}
@@ -314,7 +356,7 @@ export default function Storefront({ products, onSelectProduct, onAddToCart, car
                         ⭐ {p.rating}
                       </span>
                       <p className="text-xs font-bold text-cyan-400">
-                        {p.price} <span className="text-[8px] text-gray-400 font-normal">ر.س</span>
+                        {p.price.toLocaleString('ar-EG')} <span className="text-[8px] text-gray-400 font-normal">د.ع</span>
                       </p>
                     </div>
                   </div>

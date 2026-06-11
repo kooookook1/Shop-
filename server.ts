@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import dotenv from "dotenv";
+import crypto from "crypto";
 import { createClient } from "@libsql/client";
 import { createServer as createViteServer } from "vite";
 
@@ -28,7 +29,7 @@ async function initDatabase() {
   try {
     // 1. Create Tables
     await db.execute(`
-      CREATE TABLE IF NOT EXISTS products (
+      CREATE TABLE IF NOT EXISTS rx_products (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         category TEXT NOT NULL,
@@ -47,11 +48,11 @@ async function initDatabase() {
     `);
 
     await db.execute(`
-      CREATE TABLE IF NOT EXISTS users (
+      CREATE TABLE IF NOT EXISTS rx_users (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         email TEXT NOT NULL UNIQUE,
-        balance REAL NOT NULL DEFAULT 450.0,
+        balance REAL NOT NULL DEFAULT 0.0,
         joinDate TEXT NOT NULL,
         status TEXT NOT NULL,
         avatarLetter TEXT NOT NULL
@@ -59,7 +60,7 @@ async function initDatabase() {
     `);
 
     await db.execute(`
-      CREATE TABLE IF NOT EXISTS orders (
+      CREATE TABLE IF NOT EXISTS rx_orders (
         id TEXT PRIMARY KEY,
         productId TEXT,
         productName TEXT,
@@ -75,7 +76,7 @@ async function initDatabase() {
     `);
 
     await db.execute(`
-      CREATE TABLE IF NOT EXISTS transactions (
+      CREATE TABLE IF NOT EXISTS rx_transactions (
         id TEXT PRIMARY KEY,
         productName TEXT,
         customerName TEXT,
@@ -90,7 +91,7 @@ async function initDatabase() {
     `);
 
     await db.execute(`
-      CREATE TABLE IF NOT EXISTS messages (
+      CREATE TABLE IF NOT EXISTS rx_messages (
         id TEXT PRIMARY KEY,
         sender TEXT NOT NULL,
         senderName TEXT NOT NULL,
@@ -101,7 +102,7 @@ async function initDatabase() {
 
     // Create custom Admin Panel Control tables
     await db.execute(`
-      CREATE TABLE IF NOT EXISTS categories (
+      CREATE TABLE IF NOT EXISTS rx_categories (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         orderIndex INTEGER NOT NULL DEFAULT 0,
@@ -113,7 +114,7 @@ async function initDatabase() {
     `);
 
     await db.execute(`
-      CREATE TABLE IF NOT EXISTS coupons (
+      CREATE TABLE IF NOT EXISTS rx_coupons (
         id TEXT PRIMARY KEY,
         code TEXT NOT NULL UNIQUE,
         type TEXT NOT NULL DEFAULT 'percent',
@@ -127,7 +128,7 @@ async function initDatabase() {
     `);
 
     await db.execute(`
-      CREATE TABLE IF NOT EXISTS banners (
+      CREATE TABLE IF NOT EXISTS rx_banners (
         id TEXT PRIMARY KEY,
         title TEXT,
         imageUrl TEXT,
@@ -139,7 +140,7 @@ async function initDatabase() {
     `);
 
     await db.execute(`
-      CREATE TABLE IF NOT EXISTS site_settings (
+      CREATE TABLE IF NOT EXISTS rx_site_settings (
         id TEXT PRIMARY KEY,
         siteName TEXT DEFAULT 'متجر ريكسون الرقمي R3XON',
         logoUrl TEXT,
@@ -154,7 +155,7 @@ async function initDatabase() {
     `);
 
     await db.execute(`
-      CREATE TABLE IF NOT EXISTS logs (
+      CREATE TABLE IF NOT EXISTS rx_logs (
         id TEXT PRIMARY KEY,
         adminName TEXT NOT NULL,
         actionType TEXT NOT NULL,
@@ -164,7 +165,7 @@ async function initDatabase() {
     `);
 
     await db.execute(`
-      CREATE TABLE IF NOT EXISTS broadcasts (
+      CREATE TABLE IF NOT EXISTS rx_broadcasts (
         id TEXT PRIMARY KEY,
         title TEXT NOT NULL,
         body TEXT NOT NULL,
@@ -175,40 +176,73 @@ async function initDatabase() {
 
     // Safe Schema Alterations to product table to support rich promotional features
     try {
-      await db.execute("ALTER TABLE products ADD COLUMN extraImages TEXT");
+      await db.execute("ALTER TABLE rx_products ADD COLUMN extraImages TEXT");
     } catch (e) {}
     try {
-      await db.execute("ALTER TABLE products ADD COLUMN videoUrl TEXT");
+      await db.execute("ALTER TABLE rx_products ADD COLUMN videoUrl TEXT");
     } catch (e) {}
     try {
-      await db.execute("ALTER TABLE products ADD COLUMN isFeatured INTEGER DEFAULT 0");
+      await db.execute("ALTER TABLE rx_products ADD COLUMN isFeatured INTEGER DEFAULT 0");
     } catch (e) {}
     try {
-      await db.execute("ALTER TABLE products ADD COLUMN isBestSeller INTEGER DEFAULT 0");
+      await db.execute("ALTER TABLE rx_products ADD COLUMN isBestSeller INTEGER DEFAULT 0");
     } catch (e) {}
     try {
-      await db.execute("ALTER TABLE products ADD COLUMN tagText TEXT");
+      await db.execute("ALTER TABLE rx_products ADD COLUMN tagText TEXT");
     } catch (e) {}
+    try {
+      await db.execute("ALTER TABLE rx_products ADD COLUMN productType TEXT DEFAULT 'standard'");
+    } catch (e) {}
+    try {
+      await db.execute("ALTER TABLE rx_products ADD COLUMN keys TEXT DEFAULT '[]'");
+    } catch (e) {}
+    try {
+      await db.execute("ALTER TABLE rx_products ADD COLUMN requirePlayerId INTEGER DEFAULT 0");
+    } catch (e) {}
+
+
+    // Safe Schema Alterations to users table
+    try {
+      await db.execute("ALTER TABLE rx_users ADD COLUMN password TEXT");
+    } catch (e) {
+      console.log('Error adding password column:', e);
+    }
+
+    // Set any old default/mock test balances (like 450.0, 350.0, 650.0) to 0.0
+    try {
+      await db.execute("UPDATE rx_users SET balance = 0.0 WHERE balance = 450.0 OR balance = 350.0 OR balance = 650.0 OR email = 'kooookook1@gmail.com' OR email = 'fatty_hasan@gmail.com'");
+      console.log('Successfully completed cleanup of older test/seed balances.');
+    } catch (e) {
+      console.log('Error cleaning up balances:', e);
+    }
 
     // Safe Schema Alterations to messages table
     try {
-      await db.execute("ALTER TABLE messages ADD COLUMN userId TEXT");
+      await db.execute("ALTER TABLE rx_messages ADD COLUMN userId TEXT");
     } catch (e) {
       console.log('Error adding userId column:', e);
     }
     try {
-      await db.execute("ALTER TABLE messages ADD COLUMN image TEXT");
+      await db.execute("ALTER TABLE rx_messages ADD COLUMN image TEXT");
     } catch (e) {
       console.log('Error adding image column:', e);
     }
     try {
-      await db.execute("ALTER TABLE messages ADD COLUMN isRead INTEGER DEFAULT 0");
+      await db.execute("ALTER TABLE rx_messages ADD COLUMN isRead INTEGER DEFAULT 0");
     } catch (e) {
       console.log('Error adding isRead column:', e);
     }
 
+    // Safe Schema Alterations to rx_site_settings table for Asiacell configuration
+    try {
+      await db.execute("ALTER TABLE rx_site_settings ADD COLUMN asiacellPhone TEXT");
+    } catch (e) {}
+    try {
+      await db.execute("ALTER TABLE rx_site_settings ADD COLUMN asiacellRate REAL DEFAULT 350.0");
+    } catch (e) {}
+
     // Seed default Categories
-    const catCheck = await db.execute("SELECT COUNT(*) as count FROM categories");
+    const catCheck = await db.execute("SELECT COUNT(*) as count FROM rx_categories");
     if (Number(catCheck.rows[0].count) === 0) {
       console.log("Seeding default categories...");
       const initialCats = [
@@ -219,18 +253,18 @@ async function initDatabase() {
       ];
       for (const c of initialCats) {
         await db.execute({
-          sql: "INSERT INTO categories (id, name, orderIndex, isActive, isHidden, viewLayout, imageOrIcon) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          sql: "INSERT INTO rx_categories (id, name, orderIndex, isActive, isHidden, viewLayout, imageOrIcon) VALUES (?, ?, ?, ?, ?, ?, ?)",
           args: [c.id, c.name, c.orderIndex, c.isActive, c.isHidden, c.viewLayout, c.imageOrIcon]
         });
       }
     }
 
     // Seed default Site Settings
-    const setCheck = await db.execute("SELECT COUNT(*) as count FROM site_settings");
+    const setCheck = await db.execute("SELECT COUNT(*) as count FROM rx_site_settings");
     if (Number(setCheck.rows[0].count) === 0) {
       console.log("Seeding default site settings...");
       await db.execute({
-        sql: `INSERT INTO site_settings (id, siteName, logoUrl, faviconUrl, primaryColor, termsPage, privacyPage, socialTwitter, socialTelegram, socialWhatsapp) 
+        sql: `INSERT INTO rx_site_settings (id, siteName, logoUrl, faviconUrl, primaryColor, termsPage, privacyPage, socialTwitter, socialTelegram, socialWhatsapp) 
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           'main',
@@ -248,7 +282,7 @@ async function initDatabase() {
     }
 
     // Seed default Banners/Promos
-    const banCheck = await db.execute("SELECT COUNT(*) as count FROM banners");
+    const banCheck = await db.execute("SELECT COUNT(*) as count FROM rx_banners");
     if (Number(banCheck.rows[0].count) === 0) {
       console.log("Seeding default banners...");
       const initialBanners = [
@@ -257,27 +291,27 @@ async function initDatabase() {
       ];
       for (const b of initialBanners) {
         await db.execute({
-          sql: "INSERT INTO banners (id, title, imageUrl, videoUrl, linkTo, isActive, orderIndex) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          sql: "INSERT INTO rx_banners (id, title, imageUrl, videoUrl, linkTo, isActive, orderIndex) VALUES (?, ?, ?, ?, ?, ?, ?)",
           args: [b.id, b.title, b.imageUrl, b.videoUrl, b.linkTo, b.isActive, b.orderIndex]
         });
       }
     }
 
     // Seed default Coupon code
-    const coupCheck = await db.execute("SELECT COUNT(*) as count FROM coupons");
+    const coupCheck = await db.execute("SELECT COUNT(*) as count FROM rx_coupons");
     if (Number(coupCheck.rows[0].count) === 0) {
       console.log("Seeding default coupon...");
       await db.execute({
-        sql: "INSERT INTO coupons (id, code, type, value, expiryDate, maxUses, usedCount, assignedTo, isActive) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        sql: "INSERT INTO rx_coupons (id, code, type, value, expiryDate, maxUses, usedCount, assignedTo, isActive) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         args: ['coup-demo', 'REX20', 'percent', 20.0, '2027-12-31', 200, 0, 'all', 1]
       });
     }
 
     // Seed default Audit Log
-    const logsCheck = await db.execute("SELECT COUNT(*) as count FROM logs");
+    const logsCheck = await db.execute("SELECT COUNT(*) as count FROM rx_logs");
     if (Number(logsCheck.rows[0].count) === 0) {
       await db.execute({
-        sql: "INSERT INTO logs (id, adminName, actionType, details, timestamp) VALUES (?, ?, ?, ?, ?)",
+        sql: "INSERT INTO rx_logs (id, adminName, actionType, details, timestamp) VALUES (?, ?, ?, ?, ?)",
         args: [`log-${Date.now()}`, 'النظام الأساسي', 'تهيئة لوحة التحكم', 'تم تأسيس لوحة الإدارة الذكية وتمرير السجلات والمخازن التفاعلية لمتجر ريكسون الرقمي.', new Date().toLocaleString('ar-SA')]
       });
     }
@@ -285,7 +319,7 @@ async function initDatabase() {
     console.log("Database tables verified successfully.");
 
     // 2. Check and Seed Products
-    const prodCheck = await db.execute("SELECT COUNT(*) as count FROM products");
+    const prodCheck = await db.execute("SELECT COUNT(*) as count FROM rx_products");
     const prodCount = Number(prodCheck.rows[0].count);
     if (prodCount === 0) {
       console.log("Seeding products table...");
@@ -385,7 +419,7 @@ async function initDatabase() {
           price: 45.00,
           originalPrice: 55.00,
           period: '660 شدة فورية',
-          stock: 150,
+          stock: 3,
           imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDDOSlnh8_DPFEpa-9U-o7j8A3KJE0PX-N1_Cv5_qO-VWn-gGvaByaflsoqHrh0m7YqJJP8_savJuHifuxTTHztb8xSFmC_Lfm1WOt0vIRXy6FoPHjjYb_kl534Im_VX-0-m3MLNIdnxu2oGeO9Yf9xA3u-DyU4y3hcDjzRMyyWcm8alN9ssrQ1VafKDmckIxzl29R8IGAhf-IFwiK_xY_cLWR3cGA1kCHnKmjVB47Zq-FqFV4-kvON1h1RtP6RX08K0FEKDzMg6mkb',
           iconName: 'gamepad-2',
           rating: 4.9,
@@ -397,21 +431,23 @@ async function initDatabase() {
             'دعم وضمان شحن رسمي موثوق مائة بالمائة'
           ]),
           gradientClass: null,
-          commission_rate: 8
+          commission_rate: 8,
+          productType: 'auto_keys',
+          keys: JSON.stringify(["PUBG-ABC1-UC660", "PUBG-XYZ2-UC660", "PUBG-QWE3-UC660"])
         }
       ];
 
       for (const p of initialProducts) {
         await db.execute({
-          sql: `INSERT INTO products (id, name, category, price, originalPrice, period, stock, imageUrl, iconName, rating, reviewsCount, features, gradientClass, commission_rate)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          args: [p.id, p.name, p.category, p.price, p.originalPrice, p.period, p.stock, p.imageUrl, p.iconName, p.rating, p.reviewsCount, p.features, p.gradientClass, p.commission_rate]
+          sql: `INSERT INTO rx_products (id, name, category, price, originalPrice, period, stock, imageUrl, iconName, rating, reviewsCount, features, gradientClass, commission_rate, productType, keys)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          args: [p.id, p.name, p.category, p.price, p.originalPrice, p.period, p.stock, p.imageUrl, p.iconName, p.rating, p.reviewsCount, p.features, p.gradientClass, p.commission_rate, (p as any).productType || 'standard', (p as any).keys || JSON.stringify([])]
         });
       }
     }
 
     // 3. Seed Users
-    const userCheck = await db.execute("SELECT COUNT(*) as count FROM users");
+    const userCheck = await db.execute("SELECT COUNT(*) as count FROM rx_users");
     const userCount = Number(userCheck.rows[0].count);
     if (userCount === 0) {
       console.log("Seeding users table...");
@@ -420,7 +456,7 @@ async function initDatabase() {
           id: 'user-ahmed',
           name: 'أحمد علي',
           email: 'kooookook1@gmail.com', // Override with user email context or default
-          balance: 650.00,
+          balance: 0.00,
           joinDate: '2024-05-15',
           status: 'VIP',
           avatarLetter: 'أ'
@@ -429,7 +465,7 @@ async function initDatabase() {
           id: 'user-fatima',
           name: 'فاطمة حسن',
           email: 'fatty_hasan@gmail.com',
-          balance: 340.00,
+          balance: 0.00,
           joinDate: '2024-04-12',
           status: 'نشط',
           avatarLetter: 'ف'
@@ -437,7 +473,7 @@ async function initDatabase() {
       ];
       for (const u of initialUsers) {
         await db.execute({
-          sql: `INSERT INTO users (id, name, email, balance, joinDate, status, avatarLetter)
+          sql: `INSERT INTO rx_users (id, name, email, balance, joinDate, status, avatarLetter)
                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
           args: [u.id, u.name, u.email, u.balance, u.joinDate, u.status, u.avatarLetter]
         });
@@ -445,7 +481,7 @@ async function initDatabase() {
     }
 
     // 4. Seed Messages
-    const msgsCheck = await db.execute("SELECT COUNT(*) as count FROM messages");
+    const msgsCheck = await db.execute("SELECT COUNT(*) as count FROM rx_messages");
     const msgsCount = Number(msgsCheck.rows[0].count);
     if (msgsCount === 0) {
       console.log("Seeding support messages...");
@@ -474,14 +510,14 @@ async function initDatabase() {
       ];
       for (const m of initialMessages) {
         await db.execute({
-          sql: `INSERT INTO messages (id, sender, senderName, text, timestamp) VALUES (?, ?, ?, ?, ?)`,
+          sql: `INSERT INTO rx_messages (id, sender, senderName, text, timestamp) VALUES (?, ?, ?, ?, ?)`,
           args: [m.id, m.sender, m.senderName, m.text, m.timestamp]
         });
       }
     }
 
     // 5. Seed Transactions (to give a rich initial analytics look)
-    const txCheck = await db.execute("SELECT COUNT(*) as count FROM transactions");
+    const txCheck = await db.execute("SELECT COUNT(*) as count FROM rx_transactions");
     const txCount = Number(txCheck.rows[0].count);
     if (txCount === 0) {
       console.log("Seeding transactions...");
@@ -513,7 +549,7 @@ async function initDatabase() {
       ];
       for (const t of dummyTx) {
         await db.execute({
-          sql: `INSERT INTO transactions (id, productName, customerName, price, status, date, iconBg, imageUrl, store_share, vendor_share)
+          sql: `INSERT INTO rx_transactions (id, productName, customerName, price, status, date, iconBg, imageUrl, store_share, vendor_share)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           args: [t.id, t.productName, t.customerName, t.price, t.status, t.date, t.iconBg, t.imageUrl, t.store_share, t.vendor_share]
         });
@@ -531,7 +567,7 @@ initDatabase();
 // 1. PRODUCTS
 app.get("/api/products", async (req, res) => {
   try {
-    const result = await db.execute("SELECT * FROM products ORDER BY id DESC");
+    const result = await db.execute("SELECT * FROM rx_products ORDER BY id DESC");
     const products = result.rows.map((row) => ({
       ...row,
       price: Number(row.price),
@@ -545,7 +581,10 @@ app.get("/api/products", async (req, res) => {
       videoUrl: row.videoUrl || "",
       isFeatured: Number(row.isFeatured || 0) === 1,
       isBestSeller: Number(row.isBestSeller || 0) === 1,
-      tagText: row.tagText || ""
+      tagText: row.tagText || "",
+      productType: row.productType || "standard",
+      keys: row.keys ? JSON.parse(row.keys as string) : [],
+      requirePlayerId: Number(row.requirePlayerId || 0) === 1
     }));
     res.json(products);
   } catch (error: any) {
@@ -555,10 +594,10 @@ app.get("/api/products", async (req, res) => {
 
 app.post("/api/products", async (req, res) => {
   try {
-    const { id, name, category, price, originalPrice, period, stock, imageUrl, iconName, rating, reviewsCount, features, gradientClass, commission_rate, extraImages, videoUrl, isFeatured, isBestSeller, tagText } = req.body;
+    const { id, name, category, price, originalPrice, period, stock, imageUrl, iconName, rating, reviewsCount, features, gradientClass, commission_rate, extraImages, videoUrl, isFeatured, isBestSeller, tagText, productType, keys, requirePlayerId } = req.body;
     await db.execute({
-      sql: `INSERT INTO products (id, name, category, price, originalPrice, period, stock, imageUrl, iconName, rating, reviewsCount, features, gradientClass, commission_rate, extraImages, videoUrl, isFeatured, isBestSeller, tagText)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO rx_products (id, name, category, price, originalPrice, period, stock, imageUrl, iconName, rating, reviewsCount, features, gradientClass, commission_rate, extraImages, videoUrl, isFeatured, isBestSeller, tagText, productType, keys, requirePlayerId)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         id || `prod-${Date.now()}`,
         name,
@@ -578,7 +617,10 @@ app.post("/api/products", async (req, res) => {
         videoUrl || "",
         isFeatured ? 1 : 0,
         isBestSeller ? 1 : 0,
-        tagText || ""
+        tagText || "",
+        productType || "standard",
+        JSON.stringify(keys || []),
+        requirePlayerId ? 1 : 0
       ]
     });
     res.json({ success: true, message: "Product created" });
@@ -590,10 +632,10 @@ app.post("/api/products", async (req, res) => {
 app.put("/api/products/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, category, price, originalPrice, period, stock, imageUrl, iconName, features, commission_rate, extraImages, videoUrl, isFeatured, isBestSeller, tagText } = req.body;
+    const { name, category, price, originalPrice, period, stock, imageUrl, iconName, features, commission_rate, extraImages, videoUrl, isFeatured, isBestSeller, tagText, productType, keys, requirePlayerId } = req.body;
     await db.execute({
-      sql: `UPDATE products 
-            SET name = ?, category = ?, price = ?, originalPrice = ?, period = ?, stock = ?, imageUrl = ?, iconName = ?, features = ?, commission_rate = ?, extraImages = ?, videoUrl = ?, isFeatured = ?, isBestSeller = ?, tagText = ?
+      sql: `UPDATE rx_products 
+            SET name = ?, category = ?, price = ?, originalPrice = ?, period = ?, stock = ?, imageUrl = ?, iconName = ?, features = ?, commission_rate = ?, extraImages = ?, videoUrl = ?, isFeatured = ?, isBestSeller = ?, tagText = ?, productType = ?, keys = ?, requirePlayerId = ?
             WHERE id = ?`,
       args: [
         name,
@@ -611,6 +653,9 @@ app.put("/api/products/:id", async (req, res) => {
         isFeatured ? 1 : 0,
         isBestSeller ? 1 : 0,
         tagText || "",
+        productType || "standard",
+        JSON.stringify(keys || []),
+        requirePlayerId ? 1 : 0,
         id
       ]
     });
@@ -624,7 +669,7 @@ app.delete("/api/products/:id", async (req, res) => {
   try {
     const { id } = req.params;
     await db.execute({
-      sql: "DELETE FROM products WHERE id = ?",
+      sql: "DELETE FROM rx_products WHERE id = ?",
       args: [id]
     });
     res.json({ success: true });
@@ -636,7 +681,7 @@ app.delete("/api/products/:id", async (req, res) => {
 // 1.1 CATEGORIES CRUD endpoints
 app.get("/api/categories", async (req, res) => {
   try {
-    const result = await db.execute("SELECT * FROM categories ORDER BY orderIndex ASC, id ASC");
+    const result = await db.execute("SELECT * FROM rx_categories ORDER BY orderIndex ASC, id ASC");
     res.json(result.rows);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -647,7 +692,7 @@ app.post("/api/categories", async (req, res) => {
   try {
     const { id, name, orderIndex, isActive, isHidden, viewLayout, imageOrIcon } = req.body;
     await db.execute({
-      sql: "INSERT INTO categories (id, name, orderIndex, isActive, isHidden, viewLayout, imageOrIcon) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      sql: "INSERT INTO rx_categories (id, name, orderIndex, isActive, isHidden, viewLayout, imageOrIcon) VALUES (?, ?, ?, ?, ?, ?, ?)",
       args: [id || `cat-${Date.now()}`, name, Number(orderIndex) || 0, isActive ? 1 : 0, isHidden ? 1 : 0, viewLayout || 'vertical', imageOrIcon || 'Shield']
     });
     res.json({ success: true });
@@ -661,7 +706,7 @@ app.put("/api/categories/:id", async (req, res) => {
     const { id } = req.params;
     const { name, orderIndex, isActive, isHidden, viewLayout, imageOrIcon } = req.body;
     await db.execute({
-      sql: "UPDATE categories SET name = ?, orderIndex = ?, isActive = ?, isHidden = ?, viewLayout = ?, imageOrIcon = ? WHERE id = ?",
+      sql: "UPDATE rx_categories SET name = ?, orderIndex = ?, isActive = ?, isHidden = ?, viewLayout = ?, imageOrIcon = ? WHERE id = ?",
       args: [name, Number(orderIndex) || 0, isActive ? 1 : 0, isHidden ? 1 : 0, viewLayout || 'vertical', imageOrIcon || 'Shield', id]
     });
     res.json({ success: true });
@@ -674,7 +719,7 @@ app.delete("/api/categories/:id", async (req, res) => {
   try {
     const { id } = req.params;
     await db.execute({
-      sql: "DELETE FROM categories WHERE id = ?",
+      sql: "DELETE FROM rx_categories WHERE id = ?",
       args: [id]
     });
     res.json({ success: true });
@@ -686,7 +731,7 @@ app.delete("/api/categories/:id", async (req, res) => {
 // 1.2 COUPONS CRUD
 app.get("/api/coupons", async (req, res) => {
   try {
-    const result = await db.execute("SELECT * FROM coupons ORDER BY id DESC");
+    const result = await db.execute("SELECT * FROM rx_coupons ORDER BY id DESC");
     res.json(result.rows);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -697,7 +742,7 @@ app.post("/api/coupons", async (req, res) => {
   try {
     const { id, code, type, value, expiryDate, maxUses, usedCount, assignedTo, isActive } = req.body;
     await db.execute({
-      sql: "INSERT INTO coupons (id, code, type, value, expiryDate, maxUses, usedCount, assignedTo, isActive) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      sql: "INSERT INTO rx_coupons (id, code, type, value, expiryDate, maxUses, usedCount, assignedTo, isActive) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       args: [id || `coup-${Date.now()}`, code, type || 'percent', Number(value), expiryDate || '', Number(maxUses) || 999, Number(usedCount) || 0, assignedTo || 'all', isActive ? 1 : 0]
     });
     res.json({ success: true });
@@ -711,7 +756,7 @@ app.put("/api/coupons/:id", async (req, res) => {
     const { id } = req.params;
     const { code, type, value, expiryDate, maxUses, usedCount, assignedTo, isActive } = req.body;
     await db.execute({
-      sql: "UPDATE coupons SET code = ?, type = ?, value = ?, expiryDate = ?, maxUses = ?, usedCount = ?, assignedTo = ?, isActive = ? WHERE id = ?",
+      sql: "UPDATE rx_coupons SET code = ?, type = ?, value = ?, expiryDate = ?, maxUses = ?, usedCount = ?, assignedTo = ?, isActive = ? WHERE id = ?",
       args: [code, type || 'percent', Number(value), expiryDate || '', Number(maxUses) || 999, Number(usedCount) || 0, assignedTo || 'all', isActive ? 1 : 0, id]
     });
     res.json({ success: true });
@@ -724,7 +769,7 @@ app.delete("/api/coupons/:id", async (req, res) => {
   try {
     const { id } = req.params;
     await db.execute({
-      sql: "DELETE FROM coupons WHERE id = ?",
+      sql: "DELETE FROM rx_coupons WHERE id = ?",
       args: [id]
     });
     res.json({ success: true });
@@ -737,7 +782,7 @@ app.post("/api/coupons/validate", async (req, res) => {
   try {
     const { code, productId, categoryId } = req.body;
     const result = await db.execute({
-      sql: "SELECT * FROM coupons WHERE code = ? AND isActive = 1",
+      sql: "SELECT * FROM rx_coupons WHERE code = ? AND isActive = 1",
       args: [code]
     });
     if (result.rows.length === 0) {
@@ -773,7 +818,7 @@ app.post("/api/coupons/validate", async (req, res) => {
 // 1.3 BANNERS CRUD
 app.get("/api/banners", async (req, res) => {
   try {
-    const result = await db.execute("SELECT * FROM banners ORDER BY orderIndex ASC");
+    const result = await db.execute("SELECT * FROM rx_banners ORDER BY orderIndex ASC");
     res.json(result.rows);
   } catch (error: any) {
     res.status(505).json({ error: error.message });
@@ -784,7 +829,7 @@ app.post("/api/banners", async (req, res) => {
   try {
     const { id, title, imageUrl, videoUrl, linkTo, isActive, orderIndex } = req.body;
     await db.execute({
-      sql: "INSERT INTO banners (id, title, imageUrl, videoUrl, linkTo, isActive, orderIndex) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      sql: "INSERT INTO rx_banners (id, title, imageUrl, videoUrl, linkTo, isActive, orderIndex) VALUES (?, ?, ?, ?, ?, ?, ?)",
       args: [id || `slide-${Date.now()}`, title || "", imageUrl || "", videoUrl || "", linkTo || "", isActive ? 1 : 0, Number(orderIndex) || 0]
     });
     res.json({ success: true });
@@ -798,7 +843,7 @@ app.put("/api/banners/:id", async (req, res) => {
     const { id } = req.params;
     const { title, imageUrl, videoUrl, linkTo, isActive, orderIndex } = req.body;
     await db.execute({
-      sql: "UPDATE banners SET title = ?, imageUrl = ?, videoUrl = ?, linkTo = ?, isActive = ?, orderIndex = ? WHERE id = ?",
+      sql: "UPDATE rx_banners SET title = ?, imageUrl = ?, videoUrl = ?, linkTo = ?, isActive = ?, orderIndex = ? WHERE id = ?",
       args: [title || "", imageUrl || "", videoUrl || "", linkTo || "", isActive ? 1 : 0, Number(orderIndex) || 0, id]
     });
     res.json({ success: true });
@@ -811,7 +856,7 @@ app.delete("/api/banners/:id", async (req, res) => {
   try {
     const { id } = req.params;
     await db.execute({
-      sql: "DELETE FROM banners WHERE id = ?",
+      sql: "DELETE FROM rx_banners WHERE id = ?",
       args: [id]
     });
     res.json({ success: true });
@@ -823,7 +868,7 @@ app.delete("/api/banners/:id", async (req, res) => {
 // 1.4 SITE SETTINGS
 app.get("/api/settings", async (req, res) => {
   try {
-    const result = await db.execute("SELECT * FROM site_settings WHERE id = 'main'");
+    const result = await db.execute("SELECT * FROM rx_site_settings WHERE id = 'main'");
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Settings not found" });
     }
@@ -835,12 +880,24 @@ app.get("/api/settings", async (req, res) => {
 
 app.post("/api/settings", async (req, res) => {
   try {
-    const { siteName, logoUrl, faviconUrl, primaryColor, termsPage, privacyPage, socialTwitter, socialTelegram, socialWhatsapp } = req.body;
+    const { siteName, logoUrl, faviconUrl, primaryColor, termsPage, privacyPage, socialTwitter, socialTelegram, socialWhatsapp, asiacellPhone, asiacellRate } = req.body;
     await db.execute({
-      sql: `UPDATE site_settings 
-            SET siteName = ?, logoUrl = ?, faviconUrl = ?, primaryColor = ?, termsPage = ?, privacyPage = ?, socialTwitter = ?, socialTelegram = ?, socialWhatsapp = ?
+      sql: `UPDATE rx_site_settings 
+            SET siteName = ?, logoUrl = ?, faviconUrl = ?, primaryColor = ?, termsPage = ?, privacyPage = ?, socialTwitter = ?, socialTelegram = ?, socialWhatsapp = ?, asiacellPhone = ?, asiacellRate = ?
             WHERE id = 'main'`,
-      args: [siteName, logoUrl || "", faviconUrl || "", primaryColor || '#22d3ee', termsPage || "", privacyPage || "", socialTwitter || "", socialTelegram || "", socialWhatsapp || ""]
+      args: [
+        siteName, 
+        logoUrl || "", 
+        faviconUrl || "", 
+        primaryColor || '#22d3ee', 
+        termsPage || "", 
+        privacyPage || "", 
+        socialTwitter || "", 
+        socialTelegram || "", 
+        socialWhatsapp || "",
+        asiacellPhone || "",
+        Number(asiacellRate) || 350.0
+      ]
     });
     res.json({ success: true });
   } catch (error: any) {
@@ -851,7 +908,7 @@ app.post("/api/settings", async (req, res) => {
 // 1.5 AUDIT LOGS
 app.get("/api/logs", async (req, res) => {
   try {
-    const result = await db.execute("SELECT * FROM logs ORDER BY id DESC LIMIT 150");
+    const result = await db.execute("SELECT * FROM rx_logs ORDER BY id DESC LIMIT 150");
     res.json(result.rows);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -863,7 +920,7 @@ app.post("/api/logs", async (req, res) => {
     const { adminName, actionType, details } = req.body;
     const timestamp = new Date().toLocaleString('ar-SA');
     await db.execute({
-      sql: "INSERT INTO logs (id, adminName, actionType, details, timestamp) VALUES (?, ?, ?, ?, ?)",
+      sql: "INSERT INTO rx_logs (id, adminName, actionType, details, timestamp) VALUES (?, ?, ?, ?, ?)",
       args: [`log-${Date.now()}`, adminName || "مشرف المتجر", actionType, details, timestamp]
     });
     res.json({ success: true });
@@ -875,7 +932,7 @@ app.post("/api/logs", async (req, res) => {
 // 1.6 BROADCASTS CRUD
 app.get("/api/broadcasts", async (req, res) => {
   try {
-    const result = await db.execute("SELECT * FROM broadcasts ORDER BY id DESC");
+    const result = await db.execute("SELECT * FROM rx_broadcasts ORDER BY id DESC");
     res.json(result.rows);
   } catch (error: any) {
     res.status(550).json({ error: error.message });
@@ -887,7 +944,7 @@ app.post("/api/broadcasts", async (req, res) => {
     const { title, body, targetAudience } = req.body;
     const createdAt = new Date().toLocaleString('ar-SA');
     await db.execute({
-      sql: "INSERT INTO broadcasts (id, title, body, targetAudience, createdAt) VALUES (?, ?, ?, ?, ?)",
+      sql: "INSERT INTO rx_broadcasts (id, title, body, targetAudience, createdAt) VALUES (?, ?, ?, ?, ?)",
       args: [`broad-${Date.now()}`, title, body, targetAudience || 'all', createdAt]
     });
     res.json({ success: true });
@@ -903,7 +960,7 @@ app.post("/api/admin/reply-message", async (req, res) => {
     const replyId = `msg-reply-${Date.now()}`;
     const timestamp = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
     await db.execute({
-      sql: "INSERT INTO messages (id, sender, senderName, text, timestamp, userId, image, isRead) VALUES (?, ?, ?, ?, ?, ?, ?, 0)",
+      sql: "INSERT INTO rx_messages (id, sender, senderName, text, timestamp, userId, image, isRead) VALUES (?, ?, ?, ?, ?, ?, ?, 0)",
       args: [replyId, 'agent', adminName || "خالد العمري", text || '', timestamp, userId || '', image || '']
     });
     res.json({ success: true, id: replyId, timestamp });
@@ -981,7 +1038,7 @@ app.put("/api/orders/:id/credentials", async (req, res) => {
     const { id } = req.params;
     const { credentials, status } = req.body;
     await db.execute({
-      sql: "UPDATE orders SET credentials = ?, status = ? WHERE id = ?",
+      sql: "UPDATE rx_orders SET credentials = ?, status = ? WHERE id = ?",
       args: [JSON.stringify(credentials || {}), status || "تم تسليم الطلب", id]
     });
     res.json({ success: true });
@@ -994,7 +1051,7 @@ app.delete("/api/orders/:id", async (req, res) => {
   try {
     const { id } = req.params;
     await db.execute({
-      sql: "DELETE FROM orders WHERE id = ?",
+      sql: "DELETE FROM rx_orders WHERE id = ?",
       args: [id]
     });
     res.json({ success: true });
@@ -1006,7 +1063,7 @@ app.delete("/api/orders/:id", async (req, res) => {
 // 2. USERS & BACKEND AUTHENTICATION GATING
 app.get("/api/users", async (req, res) => {
   try {
-    const result = await db.execute("SELECT * FROM users");
+    const result = await db.execute("SELECT * FROM rx_users");
     const users = result.rows.map((row) => ({
       ...row,
       balance: Number(row.balance),
@@ -1019,19 +1076,26 @@ app.get("/api/users", async (req, res) => {
 
 app.post("/api/login", async (req, res) => {
   try {
-    const { email, name } = req.body;
+    const { email, name, password } = req.body;
     if (!email) {
       return res.status(400).json({ error: "Email is required" });
     }
     
     // Check if user exists
     const check = await db.execute({
-      sql: "SELECT * FROM users WHERE email = ?",
+      sql: "SELECT * FROM rx_users WHERE email = ?",
       args: [email]
     });
 
     if (check.rows.length > 0) {
       const u = check.rows[0];
+      if (password) {
+        await db.execute({
+          sql: "UPDATE rx_users SET password = ? WHERE email = ?",
+          args: [password, email]
+        });
+        u.password = password;
+      }
       return res.json({
         ...u,
         balance: Number(u.balance),
@@ -1042,14 +1106,14 @@ app.post("/api/login", async (req, res) => {
     const id = `user-${Date.now()}`;
     const avatarLetter = name ? name.charAt(0) : email.charAt(0).toUpperCase();
     const joinDate = new Date().toISOString().split('T')[0];
-    const balance = 350.0; // Gift starting balance for test mode
+    const balance = 0.0; // Starting balance is zero
     
     await db.execute({
-      sql: "INSERT INTO users (id, name, email, balance, joinDate, status, avatarLetter) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      args: [id, name || email.split("@")[0], email, balance, joinDate, "نشط", avatarLetter]
+      sql: "INSERT INTO rx_users (id, name, email, balance, joinDate, status, avatarLetter, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      args: [id, name || email.split("@")[0], email, balance, joinDate, "نشط", avatarLetter, password || ""]
     });
 
-    res.json({ id, name: name || email.split("@")[0], email, balance, joinDate, status: "نشط", avatarLetter });
+    res.json({ id, name: name || email.split("@")[0], email, balance, joinDate, status: "نشط", avatarLetter, password: password || "" });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -1061,7 +1125,7 @@ app.post("/api/users/:id/balance", async (req, res) => {
     const { id } = req.params;
     const { amount } = req.body;
     await db.execute({
-      sql: "UPDATE users SET balance = balance + ? WHERE id = ?",
+      sql: "UPDATE rx_users SET balance = balance + ? WHERE id = ?",
       args: [Number(amount), id]
     });
     res.json({ success: true });
@@ -1070,14 +1134,57 @@ app.post("/api/users/:id/balance", async (req, res) => {
   }
 });
 
-// Update User Name Directly
+// Update User Name / Email / Password Directly
 app.post("/api/users/:id/update", async (req, res) => {
   try {
     const { id } = req.params;
-    const { name } = req.body;
+    const { name, email, password } = req.body;
+    if (password !== undefined) {
+      await db.execute({
+        sql: "UPDATE rx_users SET name = ?, email = ?, password = ? WHERE id = ?",
+        args: [name, email, password, id]
+      });
+    } else {
+      await db.execute({
+        sql: "UPDATE rx_users SET name = ?, email = ? WHERE id = ?",
+        args: [name, email, id]
+      });
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update user details (PUT)
+app.put("/api/users/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, email, balance, status, password } = req.body;
+    if (password !== undefined) {
+      await db.execute({
+        sql: "UPDATE rx_users SET name = ?, email = ?, balance = ?, status = ?, password = ? WHERE id = ?",
+        args: [name, email, Number(balance), status, password, id]
+      });
+    } else {
+      await db.execute({
+        sql: "UPDATE rx_users SET name = ?, email = ?, balance = ?, status = ? WHERE id = ?",
+        args: [name, email, Number(balance), status, id]
+      });
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete user (DELETE)
+app.delete("/api/users/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
     await db.execute({
-      sql: "UPDATE users SET name = ? WHERE id = ?",
-      args: [name, id]
+      sql: "DELETE FROM rx_users WHERE id = ?",
+      args: [id]
     });
     res.json({ success: true });
   } catch (error: any) {
@@ -1088,7 +1195,7 @@ app.post("/api/users/:id/update", async (req, res) => {
 // 3. ORDERS (PURCHASE LOGIC & COMMISSION DIVISION)
 app.get("/api/orders", async (req, res) => {
   try {
-    const result = await db.execute("SELECT * FROM orders ORDER BY date DESC, id DESC");
+    const result = await db.execute("SELECT * FROM rx_orders ORDER BY date DESC, id DESC");
     const orders = result.rows.map((r) => ({
       ...r,
       price: Number(r.price),
@@ -1107,10 +1214,13 @@ app.post("/api/orders", async (req, res) => {
   try {
     const { items, userId, discountAmount } = req.body;
     
+    if (!userId) return res.status(400).json({ error: "Missing userId" });
+    if (!items || items.length === 0) return res.status(400).json({ error: "Empty items" });
+
     // Get user details
     const userRes = await db.execute({
-      sql: "SELECT * FROM users WHERE id = ?",
-      args: [userId]
+      sql: "SELECT * FROM rx_users WHERE id = ?",
+      args: [String(userId)]
     });
 
     if (userRes.rows.length === 0) {
@@ -1120,6 +1230,30 @@ app.post("/api/orders", async (req, res) => {
     const user = userRes.rows[0];
     let userBalance = Number(user.balance);
 
+    let projectedGrandTotal = 0;
+    // Fast pass to verify stocks and balance
+    for (const item of items) {
+      const { product, quantity, selectedPlan } = item;
+      if (!product || !product.id) return res.status(400).json({ error: "Invalid product" });
+      const prodRes = await db.execute({ sql: "SELECT * FROM rx_products WHERE id = ?", args: [String(product.id)] });
+      if (prodRes.rows.length === 0) return res.status(404).json({ error: `Product ${product.name} not found` });
+      
+      const dbProduct = prodRes.rows[0];
+      const stock = Number(dbProduct.stock);
+      if (stock < quantity) return res.status(400).json({ error: `الكمية غير كافية للمنتج: ${product.name}` });
+
+      const isSub1 = ['accounts', 'entertainment', 'productivity'].includes(String(dbProduct.category));
+      const singlePrice = (!isSub1 || selectedPlan === 'yearly') ? Number(dbProduct.price) : Number((Number(dbProduct.price) / 12).toFixed(2));
+      projectedGrandTotal += (singlePrice * quantity);
+    }
+    
+    const netSpent = projectedGrandTotal - (discountAmount || 0);
+    const finalBillWithTax = netSpent + (netSpent * 0.15);
+
+    if (userBalance < finalBillWithTax) {
+       return res.status(400).json({ error: 'عذراً، رصيدك الحالي غير كافٍ لإتمام عملية الشراء! يرجى شحن الرصيد.' });
+    }
+
     const createdOrders = [];
     let grandTotal = 0;
 
@@ -1127,10 +1261,12 @@ app.post("/api/orders", async (req, res) => {
     for (const item of items) {
       const { product, quantity, selectedPlan } = item;
       
+      if (!product || !product.id) return res.status(400).json({ error: "Invalid product in cart" });
+
       // Get latest state of product
       const prodRes = await db.execute({
-        sql: "SELECT * FROM products WHERE id = ?",
-        args: [product.id]
+        sql: "SELECT * FROM rx_products WHERE id = ?",
+        args: [String(product.id)]
       });
 
       if (prodRes.rows.length === 0) {
@@ -1144,7 +1280,8 @@ app.post("/api/orders", async (req, res) => {
         return res.status(400).json({ error: `الكمية غير كافية للمنتج: ${product.name}` });
       }
 
-      const singlePrice = selectedPlan === 'yearly' ? Number(dbProduct.price) : Number((Number(dbProduct.price) / 12).toFixed(2));
+      const isSub2 = ['accounts', 'entertainment', 'productivity'].includes(String(dbProduct.category));
+      const singlePrice = (!isSub2 || selectedPlan === 'yearly') ? Number(dbProduct.price) : Number((Number(dbProduct.price) / 12).toFixed(2));
       const subtotal = singlePrice * quantity;
       grandTotal += subtotal;
 
@@ -1153,44 +1290,72 @@ app.post("/api/orders", async (req, res) => {
       const storeShare = subtotal * (commRate / 100);
       const vendorShare = subtotal - storeShare;
 
-      // generate auto account credentials for instantaneous premium delivery
-      const randId = Math.floor(10000 + Math.random() * 90000);
-      const randUser = `rx_${String(dbProduct.id).split('-')[1] || 'cust'}_${Math.floor(Math.random() * 99)}`;
-      const randPass = `RxSecure${Math.floor(Math.random() * 999)}!`;
-      const randCode = `RX-KEY-${Math.floor(1000 + Math.random() * 9000)}-${(String(dbProduct.id)).split('-')[1]?.toUpperCase() || 'VAL'}`;
-
       let creds: any = {};
-      if (dbProduct.category === 'accounts' || dbProduct.category === 'entertainment') {
-        creds = { username: randUser, password: randPass };
+      let orderStatus = 'تم تسليم الطلب';
+
+      if (dbProduct.productType === 'auto_keys') {
+        const keysArr = dbProduct.keys ? JSON.parse(dbProduct.keys as string) : [];
+        if (keysArr.length < quantity) {
+          return res.status(400).json({ error: `نعتذر، لا تتوفر مفاتيح/حسابات كافية حالياً للمنتج: ${product.name}` });
+        }
+        const assignedKeys = keysArr.splice(0, quantity);
+        creds = { keys: assignedKeys };
+        // Update remaining keys and stock
+        await db.execute({
+          sql: "UPDATE rx_products SET keys = ?, stock = ? WHERE id = ?",
+          args: [String(JSON.stringify(keysArr)), Number(keysArr.length) || 0, String(dbProduct.id)]
+        });
+      } else if (dbProduct.productType === 'manual_id' || dbProduct.requirePlayerId) {
+        creds = { playerId: item.playerId || 'لم يتم إدخال كود اللاعب' };
+        orderStatus = 'قيد الانتظار';
+        // Still decrement stock if needed, or leave it as is if manual isn't restricted by stock.
+        // We'll decrement stock for consistency.
+        await db.execute({
+          sql: "UPDATE rx_products SET stock = stock - ? WHERE id = ?",
+          args: [Number(quantity) || 1, String(dbProduct.id)]
+        });
       } else {
-        creds = { code: randCode };
+        // Standard instantaneous simulated credential generation for preview
+        const randUser = `rx_${String(dbProduct.id).split('-')[1] || 'cust'}_${Math.floor(Math.random() * 99)}`;
+        const randPass = `RxSecure${Math.floor(Math.random() * 999)}!`;
+        const randCode = `RX-KEY-${Math.floor(1000 + Math.random() * 9000)}-${(String(dbProduct.id)).split('-')[1]?.toUpperCase() || 'VAL'}`;
+
+        if (dbProduct.category === 'accounts' || dbProduct.category === 'entertainment') {
+          creds = { username: randUser, password: randPass };
+        } else {
+          creds = { code: randCode };
+        }
+        await db.execute({
+          sql: "UPDATE rx_products SET stock = stock - ? WHERE id = ?",
+          args: [Number(quantity) || 1, String(dbProduct.id)]
+        });
       }
 
-      // Decrement stock
-      await db.execute({
-        sql: "UPDATE products SET stock = stock - ? WHERE id = ?",
-        args: [quantity, dbProduct.id]
-      });
-
       // Insert Order record
+      const randId = Math.floor(10000 + Math.random() * 90000);
       const orderId = `ord-${randId}`;
       const dateStr = new Date().toLocaleDateString('ar-EG');
       
+      const safeSubtotal = isNaN(Number(subtotal)) ? 0 : Number(subtotal);
+      const safeCommRate = isNaN(Number(commRate)) ? 15 : Number(commRate);
+      const safeStoreShare = isNaN(Number(storeShare)) ? 0 : Number(storeShare);
+      const safeVendorShare = isNaN(Number(vendorShare)) ? 0 : Number(vendorShare);
+
       await db.execute({
-        sql: `INSERT INTO orders (id, productId, productName, price, date, status, credentials, imageUrl, commission_rate, store_share, vendor_share)
+        sql: `INSERT INTO rx_orders (id, productId, productName, price, date, status, credentials, imageUrl, commission_rate, store_share, vendor_share)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
-          orderId,
-          dbProduct.id,
-          dbProduct.name,
-          subtotal,
-          dateStr,
-          'تم تسليم الطلب',
-          JSON.stringify(creds),
-          dbProduct.imageUrl || "",
-          commRate,
-          storeShare,
-          vendorShare
+          String(orderId),
+          String(dbProduct.id),
+          String(dbProduct.name || 'منتج مجهول'),
+          safeSubtotal,
+          String(dateStr),
+          String(orderStatus),
+          String(JSON.stringify(creds)),
+          String(dbProduct.imageUrl || ""),
+          safeCommRate,
+          safeStoreShare,
+          safeVendorShare
         ]
       });
 
@@ -1200,43 +1365,47 @@ app.post("/api/orders", async (req, res) => {
         productName: dbProduct.name,
         price: subtotal,
         date: dateStr,
-        status: 'تم تسليم الطلب',
+        status: orderStatus,
         credentials: creds,
         imageUrl: dbProduct.imageUrl
       });
     }
 
-    const netSpent = grandTotal - (discountAmount || 0);
-    const finalBillWithTax = netSpent + (netSpent * 0.15);
-
+    const safeFinalBillWithTax = isNaN(Number(finalBillWithTax)) ? 0 : Number(finalBillWithTax);
     // Deduct user balance
     await db.execute({
-      sql: "UPDATE users SET balance = balance - ? WHERE id = ?",
-      args: [finalBillWithTax, userId]
+      sql: "UPDATE rx_users SET balance = balance - ? WHERE id = ?",
+      args: [safeFinalBillWithTax, String(userId)]
     });
 
     // Register a Transaction log
     const txnId = `TXN-${Date.now().toString().slice(-4)}`;
     const txProdName = items[0].product.name + (items.length > 1 ? ` (+${items.length - 1})` : '');
     const iconBg = items[0].product.category === 'games' ? 'bg-[#5865F2]' : 'bg-[#d4af37]';
-    const totalCommRate = Number(items[0].product.commission_rate || 15);
-    const overallStoreShare = netSpent * (totalCommRate / 100);
-    const overallVendorShare = netSpent - overallStoreShare;
+    
+    const parsedCommRate = Number(items[0].product.commission_rate);
+    const safeTotalCommRate = isNaN(parsedCommRate) ? 15 : parsedCommRate;
+    
+    const rawOverallStoreShare = (Number(netSpent) || 0) * (safeTotalCommRate / 100);
+    const safeOverallStoreShare = isNaN(rawOverallStoreShare) ? 0 : rawOverallStoreShare;
+    
+    const rawOverallVendorShare = (Number(netSpent) || 0) - safeOverallStoreShare;
+    const safeOverallVendorShare = isNaN(rawOverallVendorShare) ? 0 : rawOverallVendorShare;
 
     await db.execute({
-      sql: `INSERT INTO transactions (id, productName, customerName, price, status, date, iconBg, imageUrl, store_share, vendor_share)
+      sql: `INSERT INTO rx_transactions (id, productName, customerName, price, status, date, iconBg, imageUrl, store_share, vendor_share)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
-        txnId,
-        txProdName,
-        user.name,
-        finalBillWithTax,
+        String(txnId),
+        String(txProdName),
+        String(user.name || 'مجهول'),
+        safeFinalBillWithTax,
         'مكتمل',
-        new Date().toISOString().split('T')[0],
-        iconBg,
-        items[0].product.imageUrl || "",
-        overallStoreShare,
-        overallVendorShare
+        String(new Date().toISOString().split('T')[0]),
+        String(iconBg),
+        String(items[0].product.imageUrl || ""),
+        safeOverallStoreShare,
+        safeOverallVendorShare
       ]
     });
 
@@ -1257,7 +1426,7 @@ app.put("/api/orders/:id/confirm", async (req, res) => {
   try {
     const { id } = req.params;
     await db.execute({
-      sql: "UPDATE orders SET status = 'مكتمل' WHERE id = ?",
+      sql: "UPDATE rx_orders SET status = 'مكتمل' WHERE id = ?",
       args: [id]
     });
     res.json({ success: true });
@@ -1269,7 +1438,7 @@ app.put("/api/orders/:id/confirm", async (req, res) => {
 // 4. TRANSACTIONS HISTORICAL DATA
 app.get("/api/transactions", async (req, res) => {
   try {
-    const result = await db.execute("SELECT * FROM transactions ORDER BY date DESC, id DESC");
+    const result = await db.execute("SELECT * FROM rx_transactions ORDER BY date DESC, id DESC");
     const txs = result.rows.map((r) => ({
       ...r,
       price: Number(r.price),
@@ -1286,10 +1455,10 @@ app.get("/api/transactions", async (req, res) => {
 app.get("/api/messages", async (req, res) => {
   try {
     const { userId } = req.query;
-    let query = "SELECT * FROM messages ORDER BY id ASC";
+    let query = "SELECT * FROM rx_messages ORDER BY id ASC";
     let args: any[] = [];
     if (userId) {
-      query = "SELECT * FROM messages WHERE userId = ? OR (userId IS NULL AND senderName = ?) ORDER BY id ASC";
+      query = "SELECT * FROM rx_messages WHERE userId = ? OR (userId IS NULL AND senderName = ?) ORDER BY id ASC";
       args = [userId, userId];
     }
     const result = await db.execute({ sql: query, args });
@@ -1301,7 +1470,7 @@ app.get("/api/messages", async (req, res) => {
 
 app.get("/api/messages/conversations", async (req, res) => {
   try {
-    const result = await db.execute("SELECT * FROM messages ORDER BY id ASC");
+    const result = await db.execute("SELECT * FROM rx_messages ORDER BY id ASC");
     const rows = result.rows;
     const conversationsMap: { [key: string]: any } = {};
 
@@ -1347,12 +1516,12 @@ app.put("/api/messages/read", async (req, res) => {
     }
     if (sender) {
       await db.execute({
-        sql: "UPDATE messages SET isRead = 1 WHERE (userId = ? OR senderName = ?) AND sender = ?",
+        sql: "UPDATE rx_messages SET isRead = 1 WHERE (userId = ? OR senderName = ?) AND sender = ?",
         args: [userId, userId, sender]
       });
     } else {
       await db.execute({
-        sql: "UPDATE messages SET isRead = 1 WHERE userId = ? OR senderName = ?",
+        sql: "UPDATE rx_messages SET isRead = 1 WHERE userId = ? OR senderName = ?",
         args: [userId, userId]
       });
     }
@@ -1362,6 +1531,682 @@ app.put("/api/messages/read", async (req, res) => {
   }
 });
 
+// ============================================================================
+// ========== ASIACELL AUTOMATED PAYMENTS INTEGRATION GATEWAY =================
+// ============================================================================
+
+const AC_API = 'https://odpapp.asiacell.com';
+const AC_API_KEY = '1ccbc4c913bc4ce785a0a2de444aa0d6';
+
+const BASE_HEADERS: any = {
+  'Host': 'odpapp.asiacell.com',
+  'X-Odp-Api-Key': AC_API_KEY,
+  'Cache-Control': 'no-cache',
+  'X-Os-Version': '9',
+  'X-Device-Type': '[Android][google][G011A 9][P][HMS][4.2.1:90000263]',
+  'X-Odp-App-Version': '4.2.1',
+  'X-From-App': 'odp',
+  'X-Odp-Channel': 'mobile',
+  'X-Screen-Type': 'false',
+  'Content-Type': 'application/json; charset=UTF-8',
+  'User-Agent': 'okhttp/5.0.0-alpha.2',
+  'Connection': 'keep-alive',
+};
+
+// Admin Session State
+let adminSession = {
+  phone: '',
+  deviceId: '',
+  accessToken: '',
+  pid: '',
+  authenticated: false,
+};
+
+// Processed transfers to avoid double-crediting
+const processedTransfers = new Set<string>();
+
+// Customer sessions map
+interface AsiacellSession {
+  phone: string;
+  deviceId: string;
+  userId: string;
+  pid: string;
+  accessToken: string | null;
+  username: string;
+  amount: number;
+  transferPid?: string;
+  step: 'otp_sent' | 'authenticated' | 'transfer_initiated';
+  createdAt: number;
+}
+const asiacellSessions = new Map<string, AsiacellSession>();
+
+// Cleanup old customer sessions
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, s] of asiacellSessions.entries()) {
+    if (now - s.createdAt > 15 * 60 * 1000) {
+      asiacellSessions.delete(id);
+    }
+  }
+}, 10 * 60 * 1000);
+
+async function getStorePhone(): Promise<string> {
+  try {
+    const result = await db.execute("SELECT asiacellPhone FROM rx_site_settings WHERE id = 'main'");
+    if (result.rows.length > 0 && result.rows[0].asiacellPhone) {
+      return String(result.rows[0].asiacellPhone);
+    }
+  } catch (e) {}
+  return process.env.ASIACELL_STORE_PHONE || "07700000000";
+}
+
+async function getExchangeRate(): Promise<number> {
+  try {
+    const result = await db.execute("SELECT asiacellRate FROM rx_site_settings WHERE id = 'main'");
+    if (result.rows.length > 0 && result.rows[0].asiacellRate) {
+      return Number(result.rows[0].asiacellRate);
+    }
+  } catch (e) {}
+  return Number(process.env.ASIACELL_EXCHANGE_RATE) || 350.0;
+}
+
+// REST Endpoints:
+app.get("/api/asiacell/admin/status", (req, res) => {
+  res.json({
+    authenticated: adminSession.authenticated,
+    phone: adminSession.phone,
+  });
+});
+
+app.post("/api/asiacell/admin/login", async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ error: 'رقم الهاتف مطلوب' });
+
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    if (!/^07\d{9}$/.test(cleanPhone)) {
+      return res.status(400).json({ error: 'رقم هاتف آسياسيل غير صالح. يجب أن يبدأ بـ 07 ويتكون من 11 رقمًا' });
+    }
+
+    const deviceId = crypto.randomUUID();
+
+    const r = await fetch(`${AC_API}/api/v1/login?lang=ar`, {
+      method: 'POST',
+      headers: { ...BASE_HEADERS, 'Deviceid': deviceId },
+      body: JSON.stringify({ captchaCode: '', username: cleanPhone }),
+    });
+    const data: any = await r.json();
+
+    console.log(`[Asiacell Admin] OTP Sent for ${cleanPhone}:`, JSON.stringify(data));
+
+    const pidMatch = (data.nextUrl || '').match(/PID=([^&]+)/);
+    const pid = pidMatch ? pidMatch[1] : '';
+
+    adminSession.phone = cleanPhone;
+    adminSession.deviceId = deviceId;
+    adminSession.pid = pid;
+    adminSession.authenticated = false;
+
+    res.json({ success: true, message: data.message || 'OTP sent' });
+  } catch (err: any) {
+    console.error('[Asiacell Admin Login Error]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/asiacell/admin/verify", async (req, res) => {
+  try {
+    const { otp } = req.body;
+    if (!otp || !adminSession.phone) {
+      return res.status(400).json({ error: 'بيانات الجلسة غير صالحة، يرجى إعادة محاولة تسجيل الدخول' });
+    }
+
+    const r = await fetch(`${AC_API}/api/v1/smsvalidation?lang=ar`, {
+      method: 'POST',
+      headers: { ...BASE_HEADERS, 'Deviceid': adminSession.deviceId },
+      body: JSON.stringify({ PID: adminSession.pid, passcode: otp }),
+    });
+    const data: any = await r.json();
+
+    console.log(`[Asiacell Admin] OTP verify:`, JSON.stringify(data));
+
+    if (data.access_token) {
+      adminSession.accessToken = data.access_token;
+      adminSession.authenticated = true;
+      console.log(`[Asiacell Admin] Authenticated successfully for ${adminSession.phone}`);
+      res.json({ success: true, message: 'تم تفعيل بوابة آسياسيل للمشرف بنجاح' });
+    } else {
+      res.json({ success: false, message: data.message || 'رمز التحقق OTP خاطئ' });
+    }
+  } catch (err: any) {
+    console.error('[Asiacell Admin Verify Error]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/asiacell/admin/logout", (req, res) => {
+  adminSession = { phone: '', deviceId: '', accessToken: '', pid: '', authenticated: false };
+  res.json({ success: true });
+});
+
+async function checkRecordsAndCredit() {
+  if (!adminSession.authenticated || !adminSession.accessToken) {
+    return { checked: false, reason: 'Admin not authenticated' };
+  }
+
+  try {
+    const headers = {
+      ...BASE_HEADERS,
+      'Deviceid': adminSession.deviceId,
+      'Authorization': `Bearer ${adminSession.accessToken}`,
+      'X-Screen-Type': 'MOBILE',
+    };
+
+    const r = await fetch(`${AC_API}/api/v1/cdr/detail?type=sms&page=1&limit=50&lang=ar&theme=avocado`, {
+      headers,
+    });
+    const data: any = await r.json();
+
+    console.log(`[Asiacell Records] Fetched ${Array.isArray(data?.data) ? data.data.length : 0} records`);
+
+    if (!data?.data || !Array.isArray(data.data)) {
+      if (data?.status === 401 || data?.message?.includes('unauthorized')) {
+        adminSession.authenticated = false;
+        console.log('[Asiacell Records] Token expired, admin needs to re-authenticate');
+      }
+      return { checked: true, processed: 0, error: 'No records data' };
+    }
+
+    let processed = 0;
+    const rate = await getExchangeRate();
+
+    for (const record of data.data) {
+      const recordId = record.id || record.transactionId || `${record.date}_${record.otherParty}`;
+      if (processedTransfers.has(recordId)) continue;
+
+      const msg = record.message || record.description || record.text || '';
+      const sender = record.otherParty || record.from || record.number || '';
+
+      const amountMatch = msg.match(/(\d+)/);
+      const isTransfer = msg.includes('تحويل') || msg.includes('رصيد') || msg.includes('transfer') || msg.includes('balance');
+
+      if (isTransfer && amountMatch && sender) {
+        const amountIQD = parseInt(amountMatch[1]);
+        const creditAmount = Math.floor((amountIQD / rate) * 100) / 100;
+
+        if (creditAmount > 0) {
+          const cleanSender = sender.replace(/[^0-9]/g, '');
+          
+          const userQuery = await db.execute({
+            sql: `SELECT * FROM rx_users WHERE id LIKE ? OR instr(id, ?) > 0 OR name LIKE ?`,
+            args: [`%${cleanSender}%`, cleanSender, `%${cleanSender}%`]
+          });
+
+          if (userQuery.rows.length > 0) {
+            const targetUser = userQuery.rows[0];
+            const newBal = Number(targetUser.balance) + creditAmount;
+            
+            await db.execute({
+              sql: "UPDATE rx_users SET balance = ? WHERE id = ?",
+              args: [newBal, String(targetUser.id)]
+            });
+
+            const txnId = `TXN-AC-${Date.now().toString().slice(-4)}`;
+            await db.execute({
+              sql: `INSERT INTO rx_transactions (id, productName, customerName, price, status, date, iconBg, imageUrl, store_share, vendor_share)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              args: [
+                txnId,
+                `شحن رصيد المحفظة عبر آسياسيل (${amountIQD} د.ع)`,
+                String(targetUser.name || 'مجهول'),
+                creditAmount,
+                'مكتمل',
+                new Date().toISOString().split('T')[0],
+                'bg-[#E91E63]',
+                '',
+                0.0,
+                creditAmount
+              ]
+            });
+
+            console.log(`[Asiacell Records] Auto-credited $${creditAmount} (IQD ${amountIQD}) to ${targetUser.name} from ${sender}`);
+            processed++;
+          }
+        }
+        processedTransfers.add(recordId);
+      }
+    }
+
+    return { checked: true, processed, total: data.data.length };
+  } catch (err: any) {
+    console.error('[Asiacell Records] Error:', err.message);
+    return { checked: false, error: err.message };
+  }
+}
+
+setInterval(() => {
+  if (adminSession.authenticated) {
+    checkRecordsAndCredit().catch(() => {});
+  }
+}, 45 * 1000);
+
+app.post("/api/asiacell/login", async (req, res) => {
+  try {
+    const { phone, userId } = req.body;
+    if (!phone || !userId) {
+      return res.status(400).json({ error: 'رقم الهاتف والـ ID الخاص بالمستخدم مطلوبان' });
+    }
+
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    if (!/^07\d{9}$/.test(cleanPhone)) {
+      return res.status(400).json({ error: 'رقم غير صالح. يجب أن يبدأ بـ 07 ويتكون من 11 رقماً' });
+    }
+
+    const deviceId = crypto.randomUUID();
+    const sessionId = crypto.randomUUID();
+
+    const r = await fetch(`${AC_API}/api/v1/login?lang=ar`, {
+      method: 'POST',
+      headers: { ...BASE_HEADERS, 'Deviceid': deviceId },
+      body: JSON.stringify({ captchaCode: '', username: cleanPhone }),
+    });
+    const data: any = await r.json();
+
+    console.log(`[Asiacell Client] Login requested for ${cleanPhone}:`, JSON.stringify(data));
+
+    const pidMatch = (data.nextUrl || '').match(/PID=([^&]+)/);
+    const pid = pidMatch ? pidMatch[1] : '';
+
+    asiacellSessions.set(sessionId, {
+      phone: cleanPhone,
+      deviceId,
+      userId,
+      pid,
+      accessToken: null,
+      username: '',
+      amount: 0,
+      step: 'otp_sent',
+      createdAt: Date.now(),
+    });
+
+    res.json({ success: true, sessionId, message: data.message || 'تم إرسال رمز التحقق OTP بنجاح' });
+  } catch (err: any) {
+    console.error('[Asiacell Client Login Error]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/asiacell/verify-otp", async (req, res) => {
+  try {
+    const { sessionId, otp } = req.body;
+    const session = asiacellSessions.get(sessionId);
+    if (!session) {
+      return res.status(400).json({ error: 'منتهية صلاحية الجلسة، يرجى إعادة المحاولة' });
+    }
+
+    const r = await fetch(`${AC_API}/api/v1/smsvalidation?lang=ar`, {
+      method: 'POST',
+      headers: { ...BASE_HEADERS, 'Deviceid': session.deviceId },
+      body: JSON.stringify({ PID: session.pid, passcode: otp }),
+    });
+    const data: any = await r.json();
+
+    console.log(`[Asiacell Client] OTP Verified for ${session.phone}:`, JSON.stringify(data));
+
+    if (data.access_token) {
+      session.accessToken = data.access_token;
+      session.step = 'authenticated';
+      asiacellSessions.set(sessionId, session);
+      res.json({ success: true, message: 'تم التحقق من الحساب بنجاح' });
+    } else {
+      res.json({ success: false, message: data.message || 'رمز OTP غير صالح' });
+    }
+  } catch (err: any) {
+    console.error('[Asiacell Client Verify Error]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/asiacell/topup", async (req, res) => {
+  try {
+    const { sessionId, voucher, username } = req.body;
+    const session = asiacellSessions.get(sessionId);
+    
+    if (!session) {
+      return res.status(400).json({ error: 'منتهية جلسة تسجيل الدخول، يرجى البدء من جديد' });
+    }
+    if (!voucher || voucher.trim().length < 4) {
+      return res.status(400).json({ error: 'رقم كارت التعبئة مطلوب' });
+    }
+    if (!username) {
+      return res.status(400).json({ error: 'اسم المستخدم مطلوب لتعبئة محفظته' });
+    }
+
+    const effectiveToken = session.accessToken || adminSession.accessToken;
+    const effectiveDeviceId = session.deviceId || adminSession.deviceId;
+
+    if (!effectiveToken) {
+      return res.status(400).json({ error: 'بوابة شحن كروت آسياسيل غير متصلة حالياً، يرجى مراجعة الدعم الفني' });
+    }
+
+    const userQuery = await db.execute({
+      sql: "SELECT * FROM rx_users WHERE id = ? OR name = ? OR email = ?",
+      args: [username.trim(), username.trim(), username.trim()]
+    });
+
+    let targetUser;
+    if (userQuery.rows.length === 0) {
+      const fallbackId = `user-${Date.now().toString().slice(-6)}`;
+      const fallbackName = username.includes('@') ? username.split('@')[0] : username.trim();
+      const joinDate = new Date().toISOString().split('T')[0];
+      await db.execute({
+        sql: "INSERT INTO rx_users (id, name, email, balance, joinDate, status, avatarLetter) VALUES (?, ?, ?, 0.0, ?, 'نشط', ?)",
+        args: [fallbackId, fallbackName, username.trim().includes('@') ? username.trim() : `${fallbackId}@rixon.com`, joinDate, fallbackName.charAt(0)]
+      });
+      console.log(`[Auto Register] Created new user ${fallbackName} during top-up.`);
+      const newQuery = await db.execute({
+        sql: "SELECT * FROM rx_users WHERE id = ?",
+        args: [fallbackId]
+      });
+      targetUser = newQuery.rows[0];
+    } else {
+      targetUser = userQuery.rows[0];
+    }
+
+    const authHeaders = {
+      'Host': 'odpapp.asiacell.com',
+      'Cache-Control': 'no-cache',
+      'Deviceid': effectiveDeviceId,
+      'X-Os-Version': '9',
+      'X-Device-Type': '[Android][google][G011A 9][P][HMS][4.2.1:90000263]',
+      'X-Odp-App-Version': '4.2.1',
+      'X-From-App': 'odp',
+      'X-Odp-Channel': 'mobile',
+      'X-Screen-Type': 'MOBILE',
+      'Authorization': `Bearer ${effectiveToken}`,
+      'Content-Type': 'application/json; charset=UTF-8',
+      'User-Agent': 'okhttp/5.0.0-alpha.2',
+      'Connection': 'keep-alive',
+    };
+
+    console.log(`[Asiacell Card Recharge] Charging to admin card...`);
+
+    const topupRes = await fetch(`${AC_API}/api/v1/top-up?lang=ar&theme=avocado`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        msisdn: '',
+        rechargeType: 1,
+        voucher: voucher.trim(),
+      }),
+    });
+    const topupData: any = await topupRes.json();
+    console.log(`[Asiacell TopUp Res]:`, JSON.stringify(topupData));
+
+    if (!topupData.success) {
+      return res.json({ success: false, message: topupData.message || 'فشل شحن كارت تعبئة الرصيد. تأكد من صحة الرمز' });
+    }
+
+    let finalAmount = 0;
+    if (topupData.analyticData?.params?.['Recharge Amount']) {
+      finalAmount = Math.floor(Number(topupData.analyticData.params['Recharge Amount']));
+    } else if (topupData.data?.amount) {
+      finalAmount = parseInt(topupData.data.amount);
+    } else if (topupData.amount) {
+      finalAmount = parseInt(topupData.amount);
+    }
+
+    if (!finalAmount || finalAmount <= 0) {
+      return res.json({ success: false, message: 'تم تفعيل كرت الشحن لكن لم يستطع النظام رصد قيمته، تواصل مع المشرف فوراً' });
+    }
+
+    const creditAmount = finalAmount;
+
+    if (creditAmount > 0) {
+      const newBal = Number(targetUser.balance) + creditAmount;
+      await db.execute({
+        sql: "UPDATE rx_users SET balance = ? WHERE id = ?",
+        args: [newBal, String(targetUser.id)]
+      });
+
+      const txnId = `TXN-AC-${Date.now().toString().slice(-4)}`;
+      await db.execute({
+        sql: `INSERT INTO rx_transactions (id, productName, customerName, price, status, date, iconBg, imageUrl, store_share, vendor_share)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          txnId,
+          `شحن كارت تعبئة آسياسيل (${finalAmount} د.ع)`,
+          String(targetUser.name || 'مجهول'),
+          creditAmount,
+          'مكتمل',
+          new Date().toISOString().split('T')[0],
+          'bg-[#E91E63]',
+          '',
+          0.0,
+          creditAmount
+        ]
+      });
+
+      console.log(`[Asiacell Card Recharge] Charged ${finalAmount} IQD. Added ${creditAmount} to ${targetUser.name}`);
+    }
+
+    asiacellSessions.delete(sessionId);
+
+    res.json({
+      success: true,
+      amountIQD: finalAmount,
+      credited: creditAmount,
+      message: `تم شحن كود التعبئة بنجاح! تم إضافة ${creditAmount} د.ع إلى رصيدك.`
+    });
+  } catch (err: any) {
+    console.error('[Asiacell Card TopUp Error]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/asiacell/transfer", async (req, res) => {
+  try {
+    const { sessionId, amount, username } = req.body;
+    const session = asiacellSessions.get(sessionId);
+
+    if (!session || !session.accessToken) {
+      return res.status(400).json({ error: 'منتهية جلسة تسجيل الدخول، يرجى البدء من جديد' });
+    }
+
+    const amountIQD = parseInt(amount);
+    if (!amountIQD || amountIQD < 250) {
+      return res.status(400).json({ error: 'الحد الأدنى لتحويل الرصيد هو 250 دينار عراقي' });
+    }
+
+    if (!username) {
+      return res.status(400).json({ error: 'اسم المستخدم مطلوب' });
+    }
+
+    const userQuery = await db.execute({
+      sql: "SELECT * FROM rx_users WHERE id = ? OR name = ? OR email = ?",
+      args: [username.trim(), username.trim(), username.trim()]
+    });
+
+    let targetUser;
+    if (userQuery.rows.length === 0) {
+      const fallbackId = `user-${Date.now().toString().slice(-6)}`;
+      const fallbackName = username.includes('@') ? username.split('@')[0] : username.trim();
+      const joinDate = new Date().toISOString().split('T')[0];
+      await db.execute({
+        sql: "INSERT INTO rx_users (id, name, email, balance, joinDate, status, avatarLetter) VALUES (?, ?, ?, 0.0, ?, 'نشط', ?)",
+        args: [fallbackId, fallbackName, username.trim().includes('@') ? username.trim() : `${fallbackId}@rixon.com`, joinDate, fallbackName.charAt(0)]
+      });
+      console.log(`[Auto Register] Created new user ${fallbackName} during transfer.`);
+      const newQuery = await db.execute({
+        sql: "SELECT * FROM rx_users WHERE id = ?",
+        args: [fallbackId]
+      });
+      targetUser = newQuery.rows[0];
+    } else {
+      targetUser = userQuery.rows[0];
+    }
+    const storePhone = await getStorePhone();
+    
+    if (!storePhone || storePhone === '07700000000') {
+      return res.status(400).json({ error: 'رقم هاتف المتجر المستلم لم يتم تهيئته بعد، تواصل مع المشرف' });
+    }
+
+    const authHeaders = {
+      ...BASE_HEADERS,
+      'Deviceid': session.deviceId,
+      'Authorization': `Bearer ${session.accessToken}`,
+      'X-Screen-Type': 'MOBILE',
+    };
+
+    console.log(`[Asiacell Credit Transfer] Transferring ${amountIQD} IQD from ${session.phone} to store phone ${storePhone}`);
+
+    const r = await fetch(`${AC_API}/api/v1/credit-transfer/start?lang=ar`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        amount: amountIQD,
+        receiverMsisdn: storePhone,
+      }),
+    });
+    const data: any = await r.json();
+
+    console.log(`[Asiacell Credit Transfer Start Res]:`, JSON.stringify(data));
+
+    if (!data.success) {
+      return res.json({ success: false, message: data.message || 'فشلت عملية تحويل الرصيد، يرجى التأكد من توفر الرصيد الكافي بهاتفك' });
+    }
+
+    session.amount = amountIQD;
+    session.username = username.trim();
+    session.transferPid = data.PID || '';
+    session.step = 'transfer_initiated';
+    asiacellSessions.set(sessionId, session);
+
+    res.json({
+      success: true,
+      message: data.message || 'تم إرسال رمز تأكيد تحويل الرصيد OTP إلى هاتفك'
+    });
+  } catch (err: any) {
+    console.error('[Asiacell Transfer Error]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/asiacell/confirm", async (req, res) => {
+  try {
+    const { sessionId, otp } = req.body;
+    const session = asiacellSessions.get(sessionId);
+
+    if (!session || session.step !== 'transfer_initiated') {
+      return res.status(400).json({ error: 'الجلسة منتهية أو لم يتم بدأ تحويل الرصيد' });
+    }
+
+    const authHeaders = {
+      ...BASE_HEADERS,
+      'Deviceid': session.deviceId,
+      'Authorization': `Bearer ${session.accessToken}`,
+      'X-Screen-Type': 'MOBILE',
+    };
+
+    const r = await fetch(`${AC_API}/api/v1/credit-transfer/do-transfer?lang=ar`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ PID: session.transferPid, passcode: otp }),
+    });
+    const data: any = await r.json();
+
+    console.log(`[Asiacell Credit Transfer Do Res]:`, JSON.stringify(data));
+
+    const creditAmount = session.amount;
+
+    let transactionCompleted = false;
+    let finalMessage = 'تم تحويل الرصيد بنجاح!';
+
+    if (data.success || data.message?.includes('نجاح') || data.message?.includes('تمت')) {
+      transactionCompleted = true;
+    } else {
+      transactionCompleted = !!data.success;
+      finalMessage = data.message || 'فشل رمز تأكيد التحويل';
+    }
+
+    if (!transactionCompleted) {
+      return res.json({ success: false, message: finalMessage });
+    }
+
+    const userQuery = await db.execute({
+      sql: "SELECT * FROM rx_users WHERE id = ? OR name = ? OR email = ?",
+      args: [session.username, session.username, session.username]
+    });
+
+    if (userQuery.rows.length > 0) {
+      const targetUser = userQuery.rows[0];
+      const newBal = Number(targetUser.balance) + creditAmount;
+      
+      await db.execute({
+        sql: "UPDATE rx_users SET balance = ? WHERE id = ?",
+        args: [newBal, String(targetUser.id)]
+      });
+
+      const txnId = `TXN-AC-${Date.now().toString().slice(-4)}`;
+      await db.execute({
+        sql: `INSERT INTO rx_transactions (id, productName, customerName, price, status, date, iconBg, imageUrl, store_share, vendor_share)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          txnId,
+          `تحويل رصيد آسياسيل (${session.amount} د.ع)`,
+          String(targetUser.name || 'مجهول'),
+          creditAmount,
+          'مكتمل',
+          new Date().toISOString().split('T')[0],
+          'bg-[#E91E63]',
+          '',
+          0.0,
+          creditAmount
+        ]
+      });
+
+      console.log(`[Asiacell] Successfully processed and added ${creditAmount} to ${targetUser.name}`);
+    }
+
+    asiacellSessions.delete(sessionId);
+
+    res.json({
+      success: true,
+      credited: creditAmount,
+      amountIQD: session.amount,
+      message: `تم التحويل بنجاح! تمت إضافة ${creditAmount} د.ع إلى رصيد محفظتك الرقمية.`
+    });
+  } catch (err: any) {
+    console.error('[Asiacell Transfer Confirm Error]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/asiacell/balance", async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    const session = asiacellSessions.get(sessionId);
+    if (!session || !session.accessToken) {
+      return res.status(400).json({ error: 'منتهية جلسة تسجيل الدخول، يرجى البدء من جديد' });
+    }
+
+    const r = await fetch(`${AC_API}/api/v5/avocado/home?lang=ar&theme=avocado`, {
+      headers: {
+        ...BASE_HEADERS,
+        'Deviceid': session.deviceId,
+        'Authorization': `Bearer ${session.accessToken}`,
+        'X-Screen-Type': 'MOBILE',
+      },
+    });
+    const data: any = await r.json();
+    res.json({ success: true, data });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+
 app.post("/api/messages", async (req, res) => {
   try {
     const { sender, senderName, text, userId, image } = req.body;
@@ -1370,7 +2215,7 @@ app.post("/api/messages", async (req, res) => {
 
     // Store user message
     await db.execute({
-      sql: "INSERT INTO messages (id, sender, senderName, text, timestamp, userId, image, isRead) VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
+      sql: "INSERT INTO rx_messages (id, sender, senderName, text, timestamp, userId, image, isRead) VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
       args: [msgId, sender, senderName, text || '', timestamp, userId || senderName, image || '']
     });
 
@@ -1390,7 +2235,7 @@ app.post("/api/messages", async (req, res) => {
 
     // Store reply in db as unread for the user (isRead = 0)
     await db.execute({
-      sql: "INSERT INTO messages (id, sender, senderName, text, timestamp, userId, image, isRead) VALUES (?, ?, ?, ?, ?, ?, ?, 0)",
+      sql: "INSERT INTO rx_messages (id, sender, senderName, text, timestamp, userId, image, isRead) VALUES (?, ?, ?, ?, ?, ?, ?, 0)",
       args: [replyId, 'agent', 'خالد العمري', replyText, replyTime, userId || senderName, '']
     });
 

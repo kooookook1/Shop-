@@ -1,20 +1,26 @@
 import React, { useState } from 'react';
 import { ArrowRight, ChevronRight, Star, Check, Sparkles, Brain, Tv, Music, Palette, Smartphone, Shield, ShoppingCart, CreditCard } from 'lucide-react';
 import { Product } from '../types';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface ProductDetailsProps {
   product: Product;
   onBack: () => void;
-  onAddToCart: (product: Product, plan: 'monthly' | 'yearly') => void;
-  onBuyNow: (product: Product, plan: 'monthly' | 'yearly') => void;
+  onAddToCart: (product: Product, plan: 'monthly' | 'yearly', playerId?: string) => void;
+  onBuyNow: (product: Product, plan: 'monthly' | 'yearly', playerId?: string) => void;
 }
 
 export default function ProductDetails({ product, onBack, onAddToCart, onBuyNow }: ProductDetailsProps) {
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('yearly');
+  const [playerId, setPlayerId] = useState('');
+  const [isImageFullscreen, setIsImageFullscreen] = useState(false);
+  const [imageIndex, setImageIndex] = useState(0);
+
+  const allImages = (product.images && product.images.length > 0) ? product.images : (product.imageUrl ? [product.imageUrl] : []);
+  const isSubscription = ['accounts', 'entertainment', 'productivity'].includes(product.category || '');
 
   // Plan adjusted price
-  const displayPrice = selectedPlan === 'yearly' ? product.price : parseFloat((product.price / 12).toFixed(2));
+  const displayPrice = (!isSubscription || selectedPlan === 'yearly') ? product.price : parseFloat((product.price / 12).toFixed(2));
 
   // Pick display icon dynamically
   let IconComp = Sparkles;
@@ -53,28 +59,37 @@ export default function ProductDetails({ product, onBack, onAddToCart, onBuyNow 
           {/* Animated background flare */}
           <div className="absolute top-0 right-0 w-44 h-44 bg-cyan-400/10 rounded-full filter blur-xl animate-pulse"></div>
 
-          <div className="relative z-10 flex justify-between items-start w-full">
-            <div className="bg-amber-400 text-black font-extrabold text-[9px] px-2 py-0.5 rounded uppercase tracking-widest">
-              مميز للغاية
-            </div>
+          {/* Product Image taking full banner width/height */}
+          <div 
+            className="absolute inset-0 z-0 cursor-pointer flex items-center justify-center"
+            onClick={() => { setImageIndex(0); setIsImageFullscreen(true); }}
+          >
+            {allImages.length > 0 ? (
+              <img 
+                src={allImages[0]} 
+                alt={product.name} 
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover opacity-90 transition-transform duration-700 hover:scale-105"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                  <IconComp size={64} className="text-amber-400 opacity-20" />
+              </div>
+            )}
             
-            <div className="bg-slate-900/60 aspect-square rounded-2xl flex items-center justify-center overflow-hidden border border-white/10 mb-6">
-              {product.imageUrl ? (
-                <img 
-                  src={product.imageUrl} 
-                  alt={product.name} 
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <IconComp size={24} className="text-amber-400" />
-              )}
+            {/* Gradient overlay for text readability */}
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/30 to-transparent"></div>
+          </div>
+
+          <div className="relative z-10 flex justify-between items-start w-full">
+            <div className="bg-amber-400 text-black font-extrabold text-[9px] px-2 py-0.5 rounded uppercase tracking-widest shadow-lg">
+              مميز للغاية
             </div>
           </div>
 
           <div className="relative z-10 text-right space-y-1">
-            <h2 className="text-3xl font-black text-white tracking-tight">{product.name}</h2>
-            <p className="text-xs text-slate-200">الأدق والأسرع في تلبية الطلبات الرقمية</p>
+            <h2 className="text-3xl font-black text-white tracking-tight drop-shadow-md">{product.name}</h2>
+            <p className="text-xs text-slate-200 drop-shadow">الأدق والأسرع في تلبية الطلبات الرقمية</p>
           </div>
         </motion.div>
       </section>
@@ -82,7 +97,9 @@ export default function ProductDetails({ product, onBack, onAddToCart, onBuyNow 
       {/* PRODUCT SUB-HEADER INFO */}
       <section className="px-4 space-y-2">
         <div className="flex flex-col gap-1">
-          <h3 className="text-xl font-bold text-white text-right">{product.name} - {selectedPlan === 'yearly' ? 'اشتراك سنوي' : 'اشتراك شهري'}</h3>
+          <h3 className="text-xl font-bold text-white text-right">
+            {product.name} {isSubscription ? (selectedPlan === 'yearly' ? '- اشتراك سنوي' : '- اشتراك شهري') : ''}
+          </h3>
           
           <div className="flex items-center justify-between pt-1">
             <div className="flex items-center gap-2">
@@ -93,31 +110,54 @@ export default function ProductDetails({ product, onBack, onAddToCart, onBuyNow 
             </div>
 
             <p className="text-2xl font-black text-white">
-              {displayPrice} <span className="text-xs text-cyan-400 font-bold">ر.س</span> 
-              <span className="text-[10px] text-gray-500 font-normal"> / {selectedPlan === 'yearly' ? 'سنةكاملة' : 'شهر'}</span>
+              {displayPrice.toLocaleString('ar-EG')} <span className="text-xs text-cyan-400 font-bold">د.ع</span> 
+              {isSubscription && (
+                <span className="text-[10px] text-gray-500 font-normal"> / {selectedPlan === 'yearly' ? 'سنةكاملة' : 'شهر'}</span>
+              )}
             </p>
           </div>
         </div>
       </section>
 
       {/* BILLING / PLAN TOGGLE BOX */}
-      <section className="px-4">
-        <div className="glass-card p-1 rounded-xl flex">
-          <button 
-            onClick={() => setSelectedPlan('monthly')}
-            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${selectedPlan === 'monthly' ? 'bg-white text-slate-950 shadow-md' : 'text-gray-400 hover:text-white'}`}
-          >
-            الدفع الشهري
-          </button>
-          <button 
-            type="button"
-            onClick={() => setSelectedPlan('yearly')}
-            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${selectedPlan === 'yearly' ? 'bg-white text-slate-950 shadow-md' : 'text-gray-400 hover:text-white'}`}
-          >
-            الدفع السنوي (وفّر ٢٠٪)
-          </button>
-        </div>
-      </section>
+      {isSubscription && (
+        <section className="px-4">
+          <div className="glass-card p-1 rounded-xl flex">
+            <button 
+              onClick={() => setSelectedPlan('monthly')}
+              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${selectedPlan === 'monthly' ? 'bg-white text-slate-950 shadow-md' : 'text-gray-400 hover:text-white'}`}
+            >
+              الدفع الشهري
+            </button>
+            <button 
+              type="button"
+              onClick={() => setSelectedPlan('yearly')}
+              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${selectedPlan === 'yearly' ? 'bg-white text-slate-950 shadow-md' : 'text-gray-400 hover:text-white'}`}
+            >
+              الدفع السنوي (وفّر ٢٠٪)
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* PLAYER ID INPUT FOR MANUAL CHARGE */}
+      {(product.productType === 'manual_id' || product.requirePlayerId) && (
+        <section className="px-4">
+          <div className="glass-card p-4 rounded-2xl border border-cyan-500/20 shadow-lg shadow-cyan-500/5">
+            <h4 className="text-xs font-bold text-white text-right mb-2">أدخل كود اللاعب (ID)</h4>
+            <p className="text-[10px] text-cyan-200 text-right mb-3">
+              لتمكيننا من شحن الرصيد لحسابك بأمان وسرعة، يرجى كتابة كود اللاعب الخاص بك (Player ID).
+            </p>
+            <input
+              type="text"
+              value={playerId}
+              onChange={(e) => setPlayerId(e.target.value)}
+              placeholder="مثال: 512345678"
+              className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-white text-right text-sm focus:border-cyan-400 focus:outline-none"
+            />
+          </div>
+        </section>
+      )}
 
       {/* CORE FEATURES LIST */}
       <section className="px-4">
@@ -142,7 +182,7 @@ export default function ProductDetails({ product, onBack, onAddToCart, onBuyNow 
         <div className="flex gap-2 max-w-sm mx-auto w-full">
           <motion.button
             whileTap={{ scale: 0.98 }}
-            onClick={() => onAddToCart(product, selectedPlan)}
+            onClick={() => onAddToCart(product, selectedPlan, playerId)}
             className="flex-1 glass-button text-white hover:text-cyan-400 py-3.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
           >
             <ShoppingCart size={15} />
@@ -151,7 +191,7 @@ export default function ProductDetails({ product, onBack, onAddToCart, onBuyNow 
           
           <motion.button
             whileTap={{ scale: 0.98 }}
-            onClick={() => onBuyNow(product, selectedPlan)}
+            onClick={() => onBuyNow(product, selectedPlan, playerId)}
             className="flex-[2] bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-slate-950 py-3.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-400/10 transition-colors"
           >
             <CreditCard size={15} />
@@ -159,6 +199,43 @@ export default function ProductDetails({ product, onBack, onAddToCart, onBuyNow 
           </motion.button>
         </div>
       </footer>
+
+      {/* FULLSCREEN IMAGE MODAL */}
+      <AnimatePresence>
+        {isImageFullscreen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4"
+            onClick={() => setIsImageFullscreen(false)}
+          >
+            <button className="absolute top-4 right-4 text-white p-2 z-10" onClick={() => setIsImageFullscreen(false)}>✕</button>
+            
+            <img src={allImages[imageIndex]} alt={product.name} className="max-w-full max-h-full object-contain" onClick={(e) => e.stopPropagation()} />
+            
+            {allImages.length > 1 && (
+              <>
+                <button 
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-white p-4 z-10"
+                  onClick={(e) => { e.stopPropagation(); setImageIndex((prev) => (prev - 1 + allImages.length) % allImages.length); }}
+                >
+                  ←
+                </button>
+                <button 
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-white p-4 z-10"
+                  onClick={(e) => { e.stopPropagation(); setImageIndex((prev) => (prev + 1) % allImages.length); }}
+                >
+                  →
+                </button>
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white text-xs z-10">
+                  {imageIndex + 1} / {allImages.length}
+                </div>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

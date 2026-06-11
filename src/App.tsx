@@ -8,6 +8,7 @@ import Storefront from './components/Storefront';
 import ProductDetails from './components/ProductDetails';
 import Checkout from './components/Checkout';
 import Profile from './components/Profile';
+import RechargePage from './components/RechargePage';
 import SupportChat from './components/SupportChat';
 import AdminDashboard from './components/AdminDashboard';
 import { motion, AnimatePresence } from 'motion/react';
@@ -38,10 +39,13 @@ export default function App() {
   });
   const [userBalance, setUserBalance] = useState<number>(() => {
     try {
+      const isLogged = localStorage.getItem('rixon_is_logged_in') === 'true';
+      if (!isLogged) return 0.00;
       const stored = localStorage.getItem('rixon_user_balance');
-      return stored ? parseFloat(stored) : 450.00;
+      const val = stored ? parseFloat(stored) : 0.00;
+      return isNaN(val) ? 0.00 : val;
     } catch {
-      return 450.00;
+      return 0.00;
     }
   });
 
@@ -54,6 +58,7 @@ export default function App() {
       return 'home';
     }
   });
+  const [profileSubSection, setProfileSubSection] = useState<'none' | 'favorites' | 'settings' | 'about' | 'recharge'>('none');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   // Synced Inventories / Users State
@@ -62,6 +67,15 @@ export default function App() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
+
+  // Use refs to prevent stale state closures in background poll effects
+  const currentUserObjRef = React.useRef(currentUserObj);
+  const currentUserRef = React.useRef(currentUser);
+
+  React.useEffect(() => {
+    currentUserObjRef.current = currentUserObj;
+    currentUserRef.current = currentUser;
+  }, [currentUserObj, currentUser]);
 
   // Cart operations State
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -124,7 +138,7 @@ export default function App() {
       setTransactions(txData);
 
       // Messages (scoped to logged-in user)
-      const currentUId = userObj?.id || currentUserObj?.id || currentUser;
+      const currentUId = userObj?.id || currentUserObjRef.current?.id || currentUserRef.current;
       const msgRes = await fetch(`/api/messages?userId=${encodeURIComponent(currentUId)}`);
       const msgData = await msgRes.json();
       if (Array.isArray(msgData)) {
@@ -135,13 +149,19 @@ export default function App() {
       }
 
       // Update current user balance if they are logged in
-      const currentId = userObj?.id || currentUserObj?.id;
+      const currentId = userObj?.id || currentUserObjRef.current?.id;
       if (currentId) {
         const foundUser = usersData.find((u: any) => u.id === currentId);
         if (foundUser) {
           setCurrentUserObj(foundUser);
-          setUserBalance(foundUser.balance);
+          const parsedBalance = typeof foundUser.balance === 'number' ? foundUser.balance : parseFloat(foundUser.balance);
+          setUserBalance(isNaN(parsedBalance) ? 0.00 : parsedBalance);
+        } else {
+          // If logged in user is no longer found in data, default to 0
+          setUserBalance(0.00);
         }
+      } else {
+        setUserBalance(0.00);
       }
     } catch (err) {
       console.error("Error fetching synced data:", err);
@@ -154,6 +174,8 @@ export default function App() {
       syncAllData();
       const interval = setInterval(() => syncAllData(), 5000); // poll every 5s for real-time transactions & chats
       return () => clearInterval(interval);
+    } else {
+      setUserBalance(0.0);
     }
   }, [isLoggedIn]);
 
@@ -171,12 +193,12 @@ export default function App() {
   }, [isLoggedIn, currentUser, currentUserObj, userBalance, activeTab]);
 
   // Login handler
-  const handleLogin = async (userName: string, email: string) => {
+  const handleLogin = async (userName: string, email: string, password?: string) => {
     try {
       const res = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, name: userName })
+        body: JSON.stringify({ email, name: userName, password })
       });
       const userObj = await res.json();
       if (userObj.error) {
@@ -185,7 +207,8 @@ export default function App() {
       }
       setCurrentUser(userObj.name);
       setCurrentUserObj(userObj);
-      setUserBalance(userObj.balance);
+      const parsedBalance = typeof userObj.balance === 'number' ? userObj.balance : parseFloat(userObj.balance);
+      setUserBalance(isNaN(parsedBalance) ? 0.00 : parsedBalance);
       setIsLoggedIn(true);
       showToast(`مرحباً بك يا ${userObj.name} في عالم ريكسون الرقمي!`, 'success');
       syncAllData(userObj);
@@ -195,14 +218,19 @@ export default function App() {
   };
 
   // Adding item to cart
-  const handleAddToCart = (product: Product, plan: 'monthly' | 'yearly' = 'yearly') => {
+  const handleAddToCart = (product: Product, plan: 'monthly' | 'yearly' = 'yearly', playerId?: string) => {
     if (product.stock <= 0) {
       showToast('عذراً، نفذت الكمية المتوفرة من هذا المنتج الرقمي!', 'info');
       return;
     }
 
+    if ((product.productType === 'manual_id' || product.requirePlayerId) && !playerId?.trim()) {
+      showToast('عذراً، يجب إدخال كود اللاعب (ID) لإتمام عملية الشراء بنجاح', 'info');
+      return;
+    }
+
     // Check if matching item is in cart
-    const existingIndex = cartItems.findIndex(i => i.product.id === product.id && i.selectedPlan === plan);
+    const existingIndex = cartItems.findIndex(i => i.product.id === product.id && i.selectedPlan === plan && i.playerId === playerId);
     if (existingIndex > -1) {
       const updated = [...cartItems];
       updated[existingIndex].quantity += 1;
@@ -212,17 +240,24 @@ export default function App() {
         id: `cart-${Date.now()}`,
         product,
         quantity: 1,
-        selectedPlan: plan
+        selectedPlan: plan,
+        playerId
       }]);
     }
     
     showToast(`تمت إضافة ${product.name} بنجاح إلى سلة المشتريات.`, 'success');
   };
 
-  const handleBuyNow = (product: Product, plan: 'monthly' | 'yearly' = 'yearly') => {
-    handleAddToCart(product, plan);
-    setSelectedProduct(null);
-    setActiveTab('cart');
+  const handleBuyNow = (product: Product, plan: 'monthly' | 'yearly' = 'yearly', playerId?: string) => {
+    if ((product.productType === 'manual_id' || product.requirePlayerId) && !playerId?.trim()) {
+      showToast('عذراً، يجب إدخال كود اللاعب (ID) لإتمام عملية الشراء بنجاح', 'info');
+      return;
+    }
+    handleAddToCart(product, plan, playerId);
+    if (product.stock > 0 && (!(product.productType === 'manual_id' || product.requirePlayerId) || playerId?.trim())) {
+      setSelectedProduct(null);
+      setActiveTab('cart');
+    }
   };
 
   // Removing from cart
@@ -244,6 +279,7 @@ export default function App() {
 
     if (userBalance < finalBillWithTax) {
       showToast('عذراً، رصيدك الحالي غير كافٍ لإتمام عملية الشراء! يرجى شحن الرصيد.', 'info');
+      setActiveTab('profile');
       return;
     }
 
@@ -329,21 +365,24 @@ export default function App() {
     showToast(`تم نسخ ${label} بنجاح للذاكرة الحافظة 📋`, 'success');
   };
 
-  const handleUpdateProfile = async (newUserId: string, newName: string) => {
+  const handleUpdateProfile = async (newUserId: string, newName: string, newEmail?: string, newPassword?: string) => {
     try {
-      const res = await fetch(`/api/users/${newUserId}/update`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName })
-      });
-      const data = await res.json();
-      if (!data.error) {
-        setCurrentUser(newName);
-        showToast('تم تحديث بيانات حسابك بنجاح!', 'success');
-        await syncAllData();
-      }
+       const res = await fetch(`/api/users/${newUserId}/update`, {
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({ name: newName, email: newEmail, password: newPassword })
+       });
+       const data = await res.json();
+       if (!data.error) {
+         setCurrentUser(newName);
+         showToast('تم تحديث بيانات حسابك بنجاح!', 'success');
+         await syncAllData();
+       } else {
+         showToast(data.error || 'فشل تحديث بيانات الحساب', 'info');
+       }
     } catch (err) {
       console.error(err);
+      showToast('حدث خطأ أثناء الاتصال بالخادم', 'info');
     }
   };
 
@@ -441,8 +480,8 @@ export default function App() {
                 <ProductDetails 
                   product={selectedProduct} 
                   onBack={() => setSelectedProduct(null)}
-                  onAddToCart={(p, plan) => handleAddToCart(p, plan)}
-                  onBuyNow={(p, plan) => handleBuyNow(p, plan)}
+                  onAddToCart={(p, plan, playerId) => handleAddToCart(p, plan, playerId)}
+                  onBuyNow={(p, plan, playerId) => handleBuyNow(p, plan, playerId)}
                 />
               </motion.div>
             ) : (
@@ -462,6 +501,11 @@ export default function App() {
                     cartCount={cartItems.reduce((acc, i) => acc + i.quantity, 0)}
                     favoriteIds={favoriteIds}
                     onToggleFavorite={handleToggleFavorite}
+                    userBalance={userBalance}
+                    onRechargeClick={() => {
+                      setProfileSubSection('recharge');
+                      setActiveTab('profile');
+                    }}
                   />
                 )}
 
@@ -496,10 +540,14 @@ export default function App() {
                     favoriteIds={favoriteIds}
                     onToggleFavorite={handleToggleFavorite}
                     allProducts={products}
-                    userId={currentUserObj?.id || ''}
+                    userId={currentUserObj?.id || users.find(u => u.name === currentUser || u.email === currentUserObj?.email)?.id || currentUser || 'guest_user'}
+                    userEmail={currentUserObj?.email || 'kooookook1@gmail.com'}
+                    userPassword={currentUserObj?.password || ''}
                     onUpdateProfile={handleUpdateProfile}
                     onAddBalance={handleAddBalance}
                     onSelectProduct={(p) => { setSelectedProduct(p); }}
+                    activeSubSection={profileSubSection}
+                    setActiveSubSection={setProfileSubSection}
                   />
                 )}
 
@@ -508,10 +556,13 @@ export default function App() {
                     products={products}
                     users={users}
                     transactions={transactions}
+                    orders={orders}
                     onAddProduct={handleAddProductAdmin}
                     onEditProduct={handleEditProductAdmin}
                     onDeleteProduct={handleDeleteProductAdmin}
                     onBackToStore={() => setActiveTab('home')}
+                    onRefreshUsers={syncAllData}
+                    onRefreshOrders={syncAllData}
                   />
                 )}
               </motion.div>
@@ -593,6 +644,20 @@ export default function App() {
 
           </nav>
         )}
+
+        {/* STANDALONE SECURE RECHARGE PAGE OVERLAY (COMPLETELY MINDFULLY ISOLATED) */}
+        <AnimatePresence>
+          {profileSubSection === 'recharge' && (
+            <RechargePage
+              userId={currentUserObj?.id || users.find(u => u.name === currentUser || u.email === currentUserObj?.email)?.id || currentUser || 'guest_user'}
+              userName={currentUser}
+              userEmail={currentUserObj?.email || 'kooookook1@gmail.com'}
+              userBalance={userBalance}
+              onAddBalance={handleAddBalance}
+              onClose={() => setProfileSubSection('none')}
+            />
+          )}
+        </AnimatePresence>
 
       </div>
     </div>
