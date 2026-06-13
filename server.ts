@@ -199,6 +199,12 @@ async function initDatabase() {
     try {
       await db.execute("ALTER TABLE rx_products ADD COLUMN requirePlayerId INTEGER DEFAULT 0");
     } catch (e) {}
+    try {
+      await db.execute("ALTER TABLE rx_products ADD COLUMN isSold INTEGER DEFAULT 0");
+    } catch (e) {}
+    try {
+      await db.execute("ALTER TABLE rx_products ADD COLUMN accountDetails TEXT DEFAULT '{}'");
+    } catch (e) {}
 
 
     // Safe Schema Alterations to users table
@@ -210,7 +216,7 @@ async function initDatabase() {
 
     // Set any old default/mock test balances (like 450.0, 350.0, 650.0) to 0.0
     try {
-      await db.execute("UPDATE rx_users SET balance = 0.0 WHERE balance = 450.0 OR balance = 350.0 OR balance = 650.0 OR email = 'kooookook1@gmail.com' OR email = 'fatty_hasan@gmail.com'");
+      await db.execute("UPDATE rx_users SET balance = 0.0 WHERE balance = 450.0 OR balance = 350.0 OR balance = 650.0");
       console.log('Successfully completed cleanup of older test/seed balances.');
     } catch (e) {
       console.log('Error cleaning up balances:', e);
@@ -568,24 +574,43 @@ initDatabase();
 app.get("/api/products", async (req, res) => {
   try {
     const result = await db.execute("SELECT * FROM rx_products ORDER BY id DESC");
-    const products = result.rows.map((row) => ({
-      ...row,
-      price: Number(row.price),
-      originalPrice: row.originalPrice ? Number(row.originalPrice) : undefined,
-      stock: Number(row.stock),
-      rating: Number(row.rating),
-      reviewsCount: Number(row.reviewsCount),
-      commission_rate: Number(row.commission_rate || 15),
-      features: row.features ? JSON.parse(row.features as string) : [],
-      extraImages: row.extraImages ? JSON.parse(row.extraImages as string) : [],
-      videoUrl: row.videoUrl || "",
-      isFeatured: Number(row.isFeatured || 0) === 1,
-      isBestSeller: Number(row.isBestSeller || 0) === 1,
-      tagText: row.tagText || "",
-      productType: row.productType || "standard",
-      keys: row.keys ? JSON.parse(row.keys as string) : [],
-      requirePlayerId: Number(row.requirePlayerId || 0) === 1
-    }));
+    const products = result.rows.map((row) => {
+      const rawDetails = row.accountDetails ? JSON.parse(row.accountDetails as string) : {};
+      const safeDetails = { ...rawDetails };
+      // Security Scrubbing of sensitive fields for non-purchased listings
+      if (safeDetails.password) {
+        safeDetails.password = "********";
+      }
+      if (safeDetails.phone) {
+        const ph = String(safeDetails.phone);
+        if (ph.length > 5) {
+          safeDetails.phone = ph.slice(0, 3) + "****" + ph.slice(-3);
+        } else {
+          safeDetails.phone = "****";
+        }
+      }
+
+      return {
+        ...row,
+        price: Number(row.price),
+        originalPrice: row.originalPrice ? Number(row.originalPrice) : undefined,
+        stock: Number(row.stock),
+        rating: Number(row.rating),
+        reviewsCount: Number(row.reviewsCount),
+        commission_rate: Number(row.commission_rate || 15),
+        features: row.features ? JSON.parse(row.features as string) : [],
+        extraImages: row.extraImages ? JSON.parse(row.extraImages as string) : [],
+        videoUrl: row.videoUrl || "",
+        isFeatured: Number(row.isFeatured || 0) === 1,
+        isBestSeller: Number(row.isBestSeller || 0) === 1,
+        tagText: row.tagText || "",
+        productType: row.productType || "standard",
+        keys: row.keys ? JSON.parse(row.keys as string) : [],
+        requirePlayerId: Number(row.requirePlayerId || 0) === 1,
+        isSold: Number(row.isSold || 0) === 1,
+        accountDetails: safeDetails
+      };
+    });
     res.json(products);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -594,10 +619,10 @@ app.get("/api/products", async (req, res) => {
 
 app.post("/api/products", async (req, res) => {
   try {
-    const { id, name, category, price, originalPrice, period, stock, imageUrl, iconName, rating, reviewsCount, features, gradientClass, commission_rate, extraImages, videoUrl, isFeatured, isBestSeller, tagText, productType, keys, requirePlayerId } = req.body;
+    const { id, name, category, price, originalPrice, period, stock, imageUrl, iconName, rating, reviewsCount, features, gradientClass, commission_rate, extraImages, videoUrl, isFeatured, isBestSeller, tagText, productType, keys, requirePlayerId, isSold, accountDetails } = req.body;
     await db.execute({
-      sql: `INSERT INTO rx_products (id, name, category, price, originalPrice, period, stock, imageUrl, iconName, rating, reviewsCount, features, gradientClass, commission_rate, extraImages, videoUrl, isFeatured, isBestSeller, tagText, productType, keys, requirePlayerId)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO rx_products (id, name, category, price, originalPrice, period, stock, imageUrl, iconName, rating, reviewsCount, features, gradientClass, commission_rate, extraImages, videoUrl, isFeatured, isBestSeller, tagText, productType, keys, requirePlayerId, isSold, accountDetails)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         id || `prod-${Date.now()}`,
         name,
@@ -620,7 +645,9 @@ app.post("/api/products", async (req, res) => {
         tagText || "",
         productType || "standard",
         JSON.stringify(keys || []),
-        requirePlayerId ? 1 : 0
+        requirePlayerId ? 1 : 0,
+        isSold ? 1 : 0,
+        JSON.stringify(accountDetails || {})
       ]
     });
     res.json({ success: true, message: "Product created" });
@@ -632,10 +659,10 @@ app.post("/api/products", async (req, res) => {
 app.put("/api/products/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, category, price, originalPrice, period, stock, imageUrl, iconName, features, commission_rate, extraImages, videoUrl, isFeatured, isBestSeller, tagText, productType, keys, requirePlayerId } = req.body;
+    const { name, category, price, originalPrice, period, stock, imageUrl, iconName, features, commission_rate, extraImages, videoUrl, isFeatured, isBestSeller, tagText, productType, keys, requirePlayerId, isSold, accountDetails } = req.body;
     await db.execute({
       sql: `UPDATE rx_products 
-            SET name = ?, category = ?, price = ?, originalPrice = ?, period = ?, stock = ?, imageUrl = ?, iconName = ?, features = ?, commission_rate = ?, extraImages = ?, videoUrl = ?, isFeatured = ?, isBestSeller = ?, tagText = ?, productType = ?, keys = ?, requirePlayerId = ?
+            SET name = ?, category = ?, price = ?, originalPrice = ?, period = ?, stock = ?, imageUrl = ?, iconName = ?, features = ?, commission_rate = ?, extraImages = ?, videoUrl = ?, isFeatured = ?, isBestSeller = ?, tagText = ?, productType = ?, keys = ?, requirePlayerId = ?, isSold = ?, accountDetails = ?
             WHERE id = ?`,
       args: [
         name,
@@ -656,6 +683,8 @@ app.put("/api/products/:id", async (req, res) => {
         productType || "standard",
         JSON.stringify(keys || []),
         requirePlayerId ? 1 : 0,
+        isSold ? 1 : 0,
+        JSON.stringify(accountDetails || {}),
         id
       ]
     });
@@ -1248,7 +1277,7 @@ app.post("/api/orders", async (req, res) => {
     }
     
     const netSpent = projectedGrandTotal - (discountAmount || 0);
-    const finalBillWithTax = netSpent + (netSpent * 0.15);
+    const finalBillWithTax = netSpent;
 
     if (userBalance < finalBillWithTax) {
        return res.status(400).json({ error: 'عذراً، رصيدك الحالي غير كافٍ لإتمام عملية الشراء! يرجى شحن الرصيد.' });
@@ -1304,6 +1333,18 @@ app.post("/api/orders", async (req, res) => {
         await db.execute({
           sql: "UPDATE rx_products SET keys = ?, stock = ? WHERE id = ?",
           args: [String(JSON.stringify(keysArr)), Number(keysArr.length) || 0, String(dbProduct.id)]
+        });
+      } else if (dbProduct.productType === 'account') {
+        const rawDetails = dbProduct.accountDetails ? JSON.parse(dbProduct.accountDetails as string) : {};
+        if (Number(dbProduct.isSold) === 1 || Number(dbProduct.stock) === 0) {
+          return res.status(400).json({ error: `عذراً، هذا الحساب قد تم بيعه لشخص آخر بالفعل! مبيوع ❌` });
+        }
+        creds = { ...rawDetails };
+        orderStatus = 'تم تسليم الطلب';
+        // Immediately mark the product sold and clear raw details from public listing for absolute security
+        await db.execute({
+          sql: "UPDATE rx_products SET isSold = 1, stock = 0, accountDetails = '{}' WHERE id = ?",
+          args: [String(dbProduct.id)]
         });
       } else if (dbProduct.productType === 'manual_id' || dbProduct.requirePlayerId) {
         creds = { playerId: item.playerId || 'لم يتم إدخال كود اللاعب' };

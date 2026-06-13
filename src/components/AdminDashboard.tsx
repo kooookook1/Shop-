@@ -6,7 +6,7 @@ import {
   Copy, ArrowUpDown, Tag, PlusCircle, Power, RefreshCw, Send, Sliders, 
   Volume2, Download, Upload, Info, MessageSquare, AlertCircle, Play, Sparkles,
   ExternalLink, Layers, FileText, Share2, HelpCircle, Eye, ShieldAlert, BadgePercent, Lock,
-  Loader2, Image as ImageIcon
+  Loader2, Image as ImageIcon, Gamepad, Zap, Wallet, Percent
 } from 'lucide-react';
 import { Product, User, Transaction, Order, Message } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -100,8 +100,19 @@ export default function AdminDashboard({
   
   // Custom Dashboard Tabs configuration
   const [activeTab, setActiveTab] = useState<
-    'analytics' | 'categories' | 'products' | 'coupons' | 'orders' | 'users' | 'chat' | 'broadcast' | 'layout' | 'settings' | 'system'
+    'analytics' | 'pubg_uc' | 'accounts_sale' | 'orders' | 'users' | 'financials' | 'settings'
   >('analytics');
+
+  const [activeSettingsSubTab, setActiveSettingsSubTab] = useState<
+    'identity' | 'categories' | 'products' | 'coupons' | 'chat' | 'broadcast' | 'layout' | 'system'
+  >('identity');
+
+  // Bulk stocking state indicators
+  const [selectedPubgProduct, setSelectedPubgProduct] = useState<string>('');
+  const [rawUcCodes, setRawUcCodes] = useState<string>('');
+  const [isBulkStocking, setIsBulkStocking] = useState<boolean>(false);
+  const [accountSaleFilter, setAccountSaleFilter] = useState<'all' | 'available' | 'sold'>('all');
+  const [editingAccountProduct, setEditingAccountProduct] = useState<Product | null>(null);
 
   // Dynamic States loaded asynchronously from our Turso/SQLite API server
   const [categories, setCategories] = useState<Category[]>([]);
@@ -216,6 +227,25 @@ export default function AdminDashboard({
   const [prodKeys, setProdKeys] = useState('');
   const [prodRequirePlayerId, setProdRequirePlayerId] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
+
+  // Custom step-by-step product wizard states
+  const [currentWizardStep, setCurrentWizardStep] = useState(1);
+  const [prodTypeStep1, setProdTypeStep1] = useState<'account' | 'charge' | 'verification' | 'tele_numbers' | 'others'>('others');
+  const [prodStep2Subtype, setProdStep2Subtype] = useState<'pubg' | 'tiktok' | 'instagram' | 'twitter' | 'telegram_chan' | 'telegram_num'>('pubg');
+  
+  // Custom account details states
+  const [accountUsername, setAccountUsername] = useState('');
+  const [accountPlayerId, setAccountPlayerId] = useState('');
+  const [accountRankOrUc, setAccountRankOrUc] = useState('');
+  const [accountLinkedMethod, setAccountLinkedMethod] = useState('');
+  const [accountPassword, setAccountPassword] = useState('');
+  const [accountLink, setAccountLink] = useState('');
+  const [accountFollowers, setAccountFollowers] = useState('');
+  const [accountIsVerified, setAccountIsVerified] = useState('no');
+  const [accountHasBotsOrLinks, setAccountHasBotsOrLinks] = useState('');
+  const [accountPhone, setAccountPhone] = useState('');
+  const [accountCountryFlag, setAccountCountryFlag] = useState('');
+  const [accountNumberType, setAccountNumberType] = useState('');
 
   // 3. Coupon Form fields
   const [coupId, setCoupId] = useState('');
@@ -477,6 +507,45 @@ export default function AdminDashboard({
       setProdProductType((p as any).productType || 'standard');
       setProdKeys(Array.isArray((p as any).keys) ? (p as any).keys.join('\n') : '');
       setProdRequirePlayerId(!!(p as any).requirePlayerId);
+
+      if (p.productType === 'account') {
+        const details = p.accountDetails || {};
+        setProdTypeStep1('account');
+        setProdStep2Subtype(details.accountSubtype || 'pubg');
+        setAccountUsername(details.username || details.usernameOrLink || '');
+        setAccountPlayerId(details.playerId || '');
+        setAccountRankOrUc(details.rankOrUc || '');
+        setAccountLinkedMethod(details.linkedMethod || '');
+        setAccountPassword(details.password || '');
+        setAccountLink(details.link || '');
+        setAccountFollowers(details.followers || details.subscribers || '');
+        setAccountIsVerified(details.isVerified || 'no');
+        setAccountHasBotsOrLinks(details.hasBotsOrLinks || '');
+        setAccountPhone(details.phone || '');
+        setAccountCountryFlag(details.countryCodeFlag || '');
+        setAccountNumberType(details.numberType || '');
+      } else {
+        if (p.productType === 'auto_keys') {
+          setProdTypeStep1('charge');
+        } else if (p.productType === 'manual_id' || p.requirePlayerId) {
+          setProdTypeStep1('verification');
+        } else {
+          setProdTypeStep1('others');
+        }
+        setProdStep2Subtype('pubg');
+        setAccountUsername('');
+        setAccountPlayerId('');
+        setAccountRankOrUc('');
+        setAccountLinkedMethod('');
+        setAccountPassword('');
+        setAccountLink('');
+        setAccountFollowers('');
+        setAccountIsVerified('no');
+        setAccountHasBotsOrLinks('');
+        setAccountPhone('');
+        setAccountCountryFlag('');
+        setAccountNumberType('');
+      }
     } else {
       setEditingProduct(null);
       setProdId(`prod-${Date.now()}`);
@@ -497,7 +566,23 @@ export default function AdminDashboard({
       setProdProductType('standard');
       setProdKeys('');
       setProdRequirePlayerId(false);
+
+      setProdTypeStep1('others');
+      setProdStep2Subtype('pubg');
+      setAccountUsername('');
+      setAccountPlayerId('');
+      setAccountRankOrUc('');
+      setAccountLinkedMethod('');
+      setAccountPassword('');
+      setAccountLink('');
+      setAccountFollowers('');
+      setAccountIsVerified('no');
+      setAccountHasBotsOrLinks('');
+      setAccountPhone('');
+      setAccountCountryFlag('');
+      setAccountNumberType('');
     }
+    setCurrentWizardStep(1);
     setActiveModal('product');
   };
 
@@ -532,6 +617,43 @@ export default function AdminDashboard({
     const exImagesList = prodExtraImages.split(',').map(img => img.trim()).filter(img => img.length > 0);
     const keysList = prodKeys.split('\n').filter(k => k.trim() !== '');
 
+    const isAccount = prodProductType === 'account';
+    let accountDetailsObj: any = {};
+    if (isAccount) {
+      accountDetailsObj.accountSubtype = prodStep2Subtype;
+      if (prodStep2Subtype === 'pubg') {
+        accountDetailsObj.username = accountUsername;
+        accountDetailsObj.playerId = accountPlayerId;
+        accountDetailsObj.rankOrUc = accountRankOrUc;
+        accountDetailsObj.linkedMethod = accountLinkedMethod;
+        accountDetailsObj.password = accountPassword;
+      } else if (prodStep2Subtype === 'tiktok') {
+        accountDetailsObj.usernameOrLink = accountUsername;
+        accountDetailsObj.followers = accountFollowers;
+        accountDetailsObj.isVerified = accountIsVerified;
+        accountDetailsObj.linkedMethod = accountLinkedMethod;
+      } else if (prodStep2Subtype === 'instagram') {
+        accountDetailsObj.link = accountLink;
+        accountDetailsObj.username = accountUsername;
+        accountDetailsObj.followers = accountFollowers;
+        accountDetailsObj.isVerified = accountIsVerified;
+        accountDetailsObj.linkedMethod = accountLinkedMethod;
+      } else if (prodStep2Subtype === 'twitter') {
+        accountDetailsObj.username = accountUsername;
+        accountDetailsObj.link = accountLink;
+        accountDetailsObj.followers = accountFollowers;
+        accountDetailsObj.isVerified = accountIsVerified;
+      } else if (prodStep2Subtype === 'telegram_chan') {
+        accountDetailsObj.link = accountLink;
+        accountDetailsObj.subscribers = accountFollowers;
+        accountDetailsObj.hasBotsOrLinks = accountHasBotsOrLinks;
+      } else if (prodStep2Subtype === 'telegram_num') {
+        accountDetailsObj.phone = accountPhone;
+        accountDetailsObj.countryCodeFlag = accountCountryFlag;
+        accountDetailsObj.numberType = accountNumberType;
+      }
+    }
+
     const body = {
       id: prodId,
       name: prodName,
@@ -539,7 +661,7 @@ export default function AdminDashboard({
       price: parseFloat(prodPrice) || 29.99,
       originalPrice: parseFloat(prodOriginalPrice) || null,
       period: prodPeriod,
-      stock: parseInt(prodStock) || 0,
+      stock: isAccount ? (editingProduct?.isSold ? 0 : 1) : (parseInt(prodStock) || 0),
       imageUrl: prodImageUrl,
       iconName: 'box',
       features: featuresList,
@@ -551,7 +673,9 @@ export default function AdminDashboard({
       tagText: prodTagText,
       productType: prodProductType,
       keys: keysList,
-      requirePlayerId: prodRequirePlayerId ? 1 : 0
+      requirePlayerId: prodRequirePlayerId ? 1 : 0,
+      isSold: isAccount ? (editingProduct?.isSold ? 1 : 0) : 0,
+      accountDetails: isAccount ? accountDetailsObj : {}
     };
 
     if (editingProduct) {
@@ -1113,7 +1237,7 @@ export default function AdminDashboard({
     
     fullOrders.forEach(o => {
       const credsText = o.credentials?.code ? `كود: ${o.credentials.code}` : `حساب: ${o.credentials?.username || ''} | سر: ${o.credentials?.password || ''}`;
-      csvContent += `${o.id},${o.productName},${o.price} ر.س,${o.date},${o.status},"${credsText}"\n`;
+      csvContent += `${o.id},${o.productName},${o.price} د.ع,${o.date},${o.status},"${credsText}"\n`;
     });
 
     const encodedUri = encodeURI(csvContent);
@@ -1252,17 +1376,13 @@ export default function AdminDashboard({
       {/* HORIZONTAL SWIPEABLE NAVIGATION RAIL FOR BOTH MOBILES AND IPADS */}
       <section className="px-4 overflow-x-auto no-scrollbar scroll-smooth flex gap-2 select-none py-1">
         {[
-          { tab: 'analytics', label: 'الإحصائيات', icon: LayoutDashboard },
-          { tab: 'categories', label: 'الأقسام', icon: Layers },
-          { tab: 'products', label: 'المنتجات', icon: ShoppingBag },
-          { tab: 'coupons', label: 'الخصومات', icon: Tag },
-          { tab: 'orders', label: 'الطلبات', icon: FileText },
-          { tab: 'users', label: 'العملاء', icon: Users },
-          { tab: 'chat', label: 'الدعم العاجل', icon: MessageSquare },
-          { tab: 'broadcast', label: 'بث إشعارات', icon: Volume2 },
-          { tab: 'layout', label: 'تخطيط الرئسية', icon: Sliders },
-          { tab: 'settings', label: 'إعداد الهوية', icon: Palette },
-          { tab: 'system', label: 'إدارة مخازن', icon: Settings },
+          { tab: 'analytics', label: 'الرئيسية 🏠', icon: LayoutDashboard },
+          { tab: 'pubg_uc', label: 'شدات PUBG ⚡', icon: Zap },
+          { tab: 'accounts_sale', label: 'بيع الحسابات 🎮', icon: Gamepad },
+          { tab: 'orders', label: 'الطلبات 📦', icon: FileText },
+          { tab: 'users', label: 'المستخدمون 👥', icon: Users },
+          { tab: 'financials', label: 'المالية 💰', icon: DollarSign },
+          { tab: 'settings', label: 'الإعدادات ⚙️', icon: Settings },
         ].map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.tab;
@@ -1285,6 +1405,38 @@ export default function AdminDashboard({
 
       {/* MAIN VIEW CONTROLLER GRID FLOW */}
       <main className="px-4 space-y-6">
+
+        {/* Global Settings Sub-tabs menu when activeTab is settings */}
+        {activeTab === 'settings' && (
+          <div className="bg-slate-900/60 p-2.5 rounded-2xl border border-white/5 space-y-2 animate-in fade-in text-right">
+            <span className="text-[10px] text-gray-400 font-extrabold text-right block px-1">⚙️ الإعدادات المتقدمة وإدارة الهوية والبيانات</span>
+            <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+              {[
+                { id: 'identity', label: 'هوية المتجر والدفع 🏢' },
+                { id: 'categories', label: 'إدارة الأقسام 📁' },
+                { id: 'products', label: 'المنتجات العامة 📦' },
+                { id: 'coupons', label: 'كوبونات الخصم 🎟️' },
+                { id: 'chat', label: 'محادثات الدعم الفني 💬' },
+                { id: 'broadcast', label: 'البث والتنبيهات 📢' },
+                { id: 'layout', label: 'السلايدرات والبنرات 🖼️' },
+                { id: 'system', label: 'النسخ والعمليات 💾' },
+              ].map((sub) => (
+                <button
+                  key={sub.id}
+                  type="button"
+                  onClick={() => setActiveSettingsSubTab(sub.id as any)}
+                  className={`px-3 py-1.5 rounded-xl text-[10px] font-extrabold whitespace-nowrap border transition-all ${
+                    activeSettingsSubTab === sub.id
+                      ? 'bg-[#fbbf24] text-slate-950 border-[#fbbf24] shadow-md font-black'
+                      : 'bg-slate-950 text-gray-400 border-white/5 hover:border-white/10 hover:text-white'
+                  }`}
+                >
+                  {sub.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* 1. TAB: ANALYTICS & INTERACTIVE KPIS */}
         {activeTab === 'analytics' && (
@@ -1366,8 +1518,588 @@ export default function AdminDashboard({
           </div>
         )}
 
+        {/* 1.1 TAB: PUBG UC CODE STOCKS AND CATEGORIES */}
+        {activeTab === 'pubg_uc' && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  setProdTypeStep1('charge');
+                  setProdProductType('auto_keys');
+                  setProdCategory('games');
+                  setProdName('شدات ببجي');
+                  setProdStock('0');
+                  setProdCommission('15');
+                  setCurrentWizardStep(1);
+                  setEditingProduct(null);
+                  setActiveModal('product');
+                }}
+                className="bg-cyan-400 text-slate-950 px-4 py-2.5 rounded-2xl text-xs font-black flex items-center gap-1.5 transition hover:bg-cyan-300 cursor-pointer"
+              >
+                <Plus size={16} />
+                <span>إضافة فئة شدات جديدة ⚡</span>
+              </button>
+              <div className="text-right">
+                <h2 className="text-sm font-black text-white flex items-center gap-1.5 justify-end">
+                  <span>إدارة فئات وأكواد PUBG Mobile UC</span>
+                  <Zap size={16} className="text-yellow-400 fill-yellow-400" />
+                </h2>
+                <p className="text-[10px] text-gray-400 mt-0.5">رفع وتحديث فوري للأكواد المتسلسلة التلقائية</p>
+              </div>
+            </div>
+
+            {/* Inventory Stock Overview Table */}
+            <div className="bg-slate-900/60 border border-white/5 rounded-3xl p-4 overflow-hidden space-y-3">
+              <h3 className="text-xs font-bold text-gray-300 text-right flex items-center justify-end gap-1">
+                <span>ملخص المخزون ومعدل المبيعات للفئات</span>
+                <Activity size={13} className="text-cyan-400" />
+              </h3>
+
+              <div className="overflow-x-auto no-scrollbar">
+                <table className="w-full text-right text-xs border-collapse divide-y divide-white/5" dir="rtl">
+                  <thead>
+                    <tr className="text-gray-400 font-bold text-[10px]">
+                      <th className="pb-2.5 text-right">الفئة الرقمية</th>
+                      <th className="pb-2.5 text-center">السعر المعتمد</th>
+                      <th className="pb-2.5 text-center">أكواد في المخزن</th>
+                      <th className="pb-2.5 text-center">أكواد مباعة</th>
+                      <th className="pb-2.5 text-left">حالة توفر المخزون</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {products
+                      .filter(p => p.productType === 'auto_keys' && p.category === 'games')
+                      .map((p) => {
+                        const parsedKeys = Array.isArray(p.keys) ? p.keys : (p.keys ? JSON.parse(p.keys as unknown as string) : []);
+                        const stockCount = parsedKeys.length || p.stock || 0;
+                        
+                        // Calculate sold keys count dynamically based on the fullOrders state
+                        const soldCount = fullOrders
+                          .filter(o => o.productId === p.id && (o.status === 'مكتب المشتريات' || o.status === 'تم تسليم الطلب' || o.status === 'مكتمل'))
+                          .reduce((sum, o) => sum + (o.quantity || 1), 0);
+
+                        let statusBadge = (
+                          <span className="text-[9px] font-bold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/10">نشط ومتوفر ✅</span>
+                        );
+                        if (stockCount === 0) {
+                          statusBadge = (
+                            <span className="text-[9px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/10">نفذت الكمية 🔴</span>
+                          );
+                        } else if (stockCount <= 10) {
+                          statusBadge = (
+                            <span className="text-[9px] font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/10">ينفد قريباً ⚠️</span>
+                          );
+                        }
+
+                        return (
+                          <tr key={p.id} className="hover:bg-white/2 transition">
+                            <td className="py-3 font-bold text-white text-right">
+                              <div className="flex items-center gap-2 justify-start">
+                                {p.imageUrl && <img src={p.imageUrl} className="w-6 h-6 rounded-md object-cover" referrerPolicy="no-referrer" />}
+                                <span>{p.name}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 text-center font-mono font-bold text-cyan-400">{(p.price ?? 0).toLocaleString('ar-EG')} د.ع</td>
+                            <td className="py-3 text-center font-mono font-extrabold text-white">{stockCount} كود</td>
+                            <td className="py-3 text-center font-mono text-gray-400">{soldCount} كود مباع</td>
+                            <td className="py-3 text-left">{statusBadge}</td>
+                          </tr>
+                        );
+                      })}
+                    {products.filter(p => p.productType === 'auto_keys' && p.category === 'games').length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center text-gray-400 text-xs">
+                          لا تتوفر أي فئات لـ شدات PUBG UC حالياً. اضغط "إضافة فئة شدات جديدة" بالاعلى.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Bulk Keys Stocker Form Panel */}
+            <div className="bg-slate-900/60 border border-white/5 rounded-3xl p-5 text-right space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] bg-green-400/10 text-green-400 px-2.5 py-0.5 rounded-full font-bold border border-green-500/15">شحن آلي فوري</span>
+                <h3 className="text-xs font-black text-white flex items-center gap-1">
+                  <span>تعبئة وتحديث مخزن الأكواد فورا</span>
+                  <Upload size={14} className="text-cyan-400" />
+                </h3>
+              </div>
+
+              <div className="space-y-3.5 text-xs">
+                <div>
+                  <label className="text-[10px] text-gray-400 block mb-1">1 | اختر فئة الـ UC المراد شحنها بالرموز:</label>
+                  <select
+                    value={selectedPubgProduct}
+                    onChange={(e) => setSelectedPubgProduct(e.target.value)}
+                    className="bg-slate-950 border border-white/10 rounded-xl py-3 px-3.5 text-right w-full text-white outline-none focus:border-cyan-400 cursor-pointer"
+                  >
+                    <option value="">-- اضغط لتحديد فئة الـ UC --</option>
+                    {products
+                      .filter(p => p.productType === 'auto_keys' && p.category === 'games')
+                      .map(p => (
+                        <option key={p.id} value={p.id}>{p.name} ({(p.price ?? 0).toLocaleString('ar-EG')} د.ع)</option>
+                      ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-gray-400 block mb-1">
+                    2 | ألصق أكواد التعبئة الجديدة (كود في كل سطر منفصل):
+                  </label>
+                  <textarea
+                    value={rawUcCodes}
+                    onChange={(e) => setRawUcCodes(e.target.value)}
+                    rows={6}
+                    placeholder="PUBG-UC-60-XXXXXX&#10;PUBG-UC-60-YYYYYY&#10;PUBG-UC-60-ZZZZZZ"
+                    className="bg-slate-950 border border-white/10 rounded-xl py-3 px-3.5 text-left font-mono text-white text-xs w-full block focus:border-cyan-400 outline-none"
+                    dir="ltr"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1.5 leading-relaxed">
+                    💡 نظام ريكسون سيقوم بقراءة الأكواد سطر بسطر، وتشفيرها لسرية العميل، وزيادة رصيد مخزون هذا المنتج تلقائياً فور الحفظ.
+                  </p>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    disabled={isBulkStocking || !selectedPubgProduct || !rawUcCodes.trim()}
+                    onClick={async () => {
+                      if (!selectedPubgProduct || !rawUcCodes.trim()) return;
+                      setIsBulkStocking(true);
+                      try {
+                        const targetProd = products.find(p => p.id === selectedPubgProduct);
+                        if (!targetProd) {
+                          alert("المنتج المحدد غير متاح!");
+                          setIsBulkStocking(false);
+                          return;
+                        }
+
+                        const lines = rawUcCodes
+                          .split('\n')
+                          .map(l => l.trim())
+                          .filter(l => l.length > 0);
+
+                        if (lines.length === 0) {
+                          alert("يرجى إدخال كود واحد على الأقل!");
+                          setIsBulkStocking(false);
+                          return;
+                        }
+
+                        const existingKeys = Array.isArray(targetProd.keys) ? targetProd.keys : (targetProd.keys ? JSON.parse(targetProd.keys as unknown as string) : []);
+                        const mergedKeys = [...existingKeys, ...lines];
+
+                        const updatedRes = await fetch(`/api/products/${targetProd.id}`, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            ...targetProd,
+                            keys: JSON.stringify(mergedKeys),
+                            stock: mergedKeys.length
+                          })
+                        });
+
+                        if (!updatedRes.ok) throw new Error("Server error appending keys.");
+
+                        await writeLog("تعديل فئة UC", `تم تزويد فئة [${targetProd.name}] بـ ${lines.length} كود/مفتاح تفعيل بنجاح.`);
+                        setRawUcCodes('');
+                        showToast(`تم إيداع ${lines.length} كود بنجاح! الرصيد الإجمالي للفئة أصبح: ${mergedKeys.length} كود. ⚡🔋`);
+                      } catch (err) {
+                        console.error(err);
+                        alert("عذراً، حدث خطأ تعذر بسببه تزويد الأكواد في قاعدة البيانات.");
+                      } finally {
+                        setIsBulkStocking(false);
+                      }
+                    }}
+                    className={`w-full py-3.5 rounded-2xl font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg transition-all ${
+                      (!selectedPubgProduct || !rawUcCodes.trim())
+                        ? 'bg-slate-800 text-gray-500 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 hover:brightness-110 shadow-cyan-400/10 cursor-pointer'
+                    }`}
+                  >
+                    {isBulkStocking ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>جاري إيداع وحفظ الأكواد بالفهارس السحابية...</span>
+                      </>
+                    ) : (
+                      <>
+                        <PlusCircle size={15} />
+                        <span>تزويد فئة الـ UC بالأكواد وحفظ الإيداع 💾</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 1.2 TAB: DIGITAL ACCOUNTS INVENTORY */}
+        {activeTab === 'accounts_sale' && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  setProdTypeStep1('account');
+                  setProdProductType('account');
+                  setProdCategory('accounts');
+                  setProdStock('1');
+                  setProdCommission('15');
+                  setProdStep2Subtype('pubg');
+                  setAccountUsername('');
+                  setAccountPassword('');
+                  setAccountPlayerId('');
+                  setAccountRankOrUc('');
+                  setAccountLinkedMethod('');
+                  setAccountFollowers('');
+                  setAccountIsVerified('no');
+                  setAccountLink('');
+                  setAccountHasBotsOrLinks('');
+                  setAccountPhone('');
+                  setAccountCountryFlag('');
+                  setAccountNumberType('');
+                  setCurrentWizardStep(1);
+                  setEditingProduct(null);
+                  setActiveModal('product');
+                }}
+                className="bg-amber-400 text-slate-950 px-4 py-2.5 rounded-2xl text-xs font-black flex items-center gap-1.5 transition hover:bg-amber-300 cursor-pointer"
+              >
+                <Plus size={16} />
+                <span>إضافة حساب للبيع 👤</span>
+              </button>
+              <div className="text-right">
+                <h2 className="text-sm font-black text-white flex items-center gap-1.5 justify-end">
+                  <span>معرض الحسابات الرقمية المميزة للبيع</span>
+                  <Gamepad size={16} className="text-amber-400" />
+                </h2>
+                <p className="text-[10px] text-gray-400 mt-0.5">ببجي، تيك توك، انستقرام، تويتر وأرقام تلقائية</p>
+              </div>
+            </div>
+
+            {/* Filter buttons to switch listings */}
+            <div className="flex gap-1.5 bg-slate-950/60 p-1 rounded-xl self-end">
+              <button
+                type="button"
+                onClick={() => setAccountSaleFilter('all')}
+                className={`flex-1 py-1.8 rounded-lg text-[10px] font-bold text-center transition-all cursor-pointer ${
+                  accountSaleFilter === 'all' ? 'bg-white text-slate-950 shadow-md font-extrabold' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                الكل ({products.filter(p => p.productType === 'account').length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setAccountSaleFilter('available')}
+                className={`flex-1 py-1.8 rounded-lg text-[10px] font-bold text-center transition-all cursor-pointer ${
+                  accountSaleFilter === 'available' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                المتاحة للبيع ({products.filter(p => p.productType === 'account' && !p.isSold && p.stock > 0).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setAccountSaleFilter('sold')}
+                className={`flex-1 py-1.8 rounded-lg text-[10px] font-bold text-center transition-all cursor-pointer ${
+                  accountSaleFilter === 'sold' ? 'bg-red-500/15 text-red-400 border border-red-500/25' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                المباعة ومؤرشفة ({products.filter(p => p.productType === 'account' && (p.isSold || p.stock === 0)).length})
+              </button>
+            </div>
+
+            {/* Grid of Accounts */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-right">
+              {products
+                .filter(p => p.productType === 'account')
+                .filter(p => {
+                  if (accountSaleFilter === 'available') return !p.isSold && p.stock > 0;
+                  if (accountSaleFilter === 'sold') return p.isSold || p.stock === 0;
+                  return true;
+                })
+                .map((p) => {
+                  const isSoldOut = p.isSold || p.stock === 0;
+                  
+                  let subtypeLabel = 'حساب رقمي';
+                  let subtypeColor = 'bg-slate-800 text-gray-300';
+                  
+                  const nameString = p.name.toLowerCase();
+                  if (nameString.includes('ببجي') || nameString.includes('pubg')) {
+                    subtypeLabel = 'PUBG Mobile 🎮';
+                    subtypeColor = 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+                  } else if (nameString.includes('تيك') || nameString.includes('tiktok')) {
+                    subtypeLabel = 'TikTok 📱';
+                    subtypeColor = 'bg-rose-500/10 text-rose-400 border border-rose-500/20';
+                  } else if (nameString.includes('انستغرام') || nameString.includes('انستقرام') || nameString.includes('instagram')) {
+                    subtypeLabel = 'Instagram 📸';
+                    subtypeColor = 'bg-purple-500/10 text-purple-400 border border-purple-500/20';
+                  } else if (nameString.includes('تويتر') || nameString.includes('twitter') || nameString.includes(' x ')) {
+                    subtypeLabel = 'Twitter/X 🐦';
+                    subtypeColor = 'bg-blue-500/10 text-blue-400 border border-blue-500/20';
+                  } else if (nameString.includes('قناة') || nameString.includes('تليجرام') || nameString.includes('telegram')) {
+                    subtypeLabel = 'Telegram Channel ✈️';
+                    subtypeColor = 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20';
+                  }
+
+                  return (
+                    <div 
+                      key={p.id} 
+                      className={`rounded-3xl p-4 text-right space-y-4 border transition-all ${
+                        isSoldOut 
+                          ? 'bg-slate-950/40 border-red-500/20 opacity-80' 
+                          : 'bg-slate-900/50 border-white/5 hover:border-white/10'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-1.5 justify-end">
+                            <span className={`text-[8.5px] px-2 py-0.5 rounded font-black ${subtypeColor}`}>
+                              {subtypeLabel}
+                            </span>
+                            {isSoldOut ? (
+                              <span className="bg-red-500/10 text-red-400 border border-red-500/20 text-[8.5px] px-2 py-0.5 rounded font-black">
+                                تم البيع ❌
+                              </span>
+                            ) : (
+                              <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[8.5px] px-2 py-0.5 rounded font-black">
+                                متاح للبيع 🟢
+                              </span>
+                            )}
+                          </div>
+                          
+                          <h4 className="text-xs font-black text-white leading-snug line-clamp-2 mt-1">{p.name}</h4>
+                          <p className="text-base font-black text-cyan-400 mt-1">{(p.price ?? 0).toLocaleString('ar-EG')} د.ع</p>
+                        </div>
+
+                        {p.imageUrl ? (
+                          <img src={p.imageUrl} className="w-16 h-16 rounded-2xl object-cover border border-white/5 bg-slate-950 shrink-0" alt="" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className="w-16 h-16 rounded-2xl bg-slate-950 text-amber-500/30 font-black text-xl flex items-center justify-center shrink-0 border border-white/5">
+                            🎮
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-2 border-t border-white/5">
+                        {isSoldOut ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const matchingOrder = fullOrders.find(o => o.productId === p.id && o.credentials);
+                              if (matchingOrder) {
+                                try {
+                                  const parsedCreds = JSON.parse(matchingOrder.credentials);
+                                  const credsStr = Object.entries(parsedCreds)
+                                    .map(([k, v]) => `${k === 'keys' ? 'أكواد الشحن' : k}: ${Array.isArray(v) ? v.join(', ') : JSON.stringify(v)}`)
+                                    .join('\n');
+                                  alert(`🔐 بيانات الحساب المباع في طلب العميل (#${matchingOrder.id}):` + '\n\n' + credsStr);
+                                } catch (e) {
+                                  alert(`🔐 معلومات التسليم: ${matchingOrder.credentials}`);
+                                }
+                              } else {
+                                alert("لم يتم العثور على سجل طلب مكتمل مسجل ببينات دخول هذا الحساب بعد.");
+                              }
+                            }}
+                            className="bg-slate-950 hover:bg-slate-900 text-gray-300 border border-white/10 text-xxs px-3 py-2 rounded-xl flex-1 font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Eye size={12} />
+                            <span>عرض معلومات الدخول المباعة 🔑</span>
+                          </button>
+                        ) : (
+                          <div className="text-xxs text-gray-400 text-right w-full font-serif italic pr-2">
+                            بيانات تسجيل الدخول مشفرة وتحفظ لحين إجراء الدفع للمشتري.
+                          </div>
+                        )}
+
+                        <div className="flex gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProdId(p.id);
+                              setProdName(p.name);
+                              setProdCategory(p.category || 'accounts');
+                              setProdPrice(p.price.toString());
+                              setProdOriginalPrice(p.originalPrice?.toString() || '');
+                              setProdPeriod(p.period || 'تسليم فوري');
+                              setProdStock('1');
+                              setProdImageUrl(p.imageUrl || '');
+                              setProdExtraImages(p.extraImages ? JSON.parse(p.extraImages).join(', ') : '');
+                              setProdCommission(p.commission_rate?.toString() || '15');
+                              setProdProductType('account');
+                              setProdTypeStep1('account');
+                              
+                              try {
+                                if (p.accountDetails) {
+                                  const parsedDetails = JSON.parse(p.accountDetails);
+                                  setAccountUsername(parsedDetails.username || parsedDetails.accountUsername || '');
+                                  setAccountPassword(parsedDetails.password || parsedDetails.accountPassword || '');
+                                  setAccountPlayerId(parsedDetails.playerId || parsedDetails.accountPlayerId || '');
+                                  setAccountRankOrUc(parsedDetails.rankOrUc || parsedDetails.accountRankOrUc || '');
+                                  setAccountLinkedMethod(parsedDetails.linkedMethod || parsedDetails.accountLinkedMethod || '');
+                                  setAccountFollowers(parsedDetails.followers || parsedDetails.accountFollowers || '');
+                                  setAccountIsVerified(parsedDetails.isVerified || parsedDetails.accountIsVerified || 'no');
+                                  setAccountLink(parsedDetails.link || parsedDetails.accountLink || '');
+                                  setAccountHasBotsOrLinks(parsedDetails.hasBotsOrLinks || parsedDetails.accountHasBotsOrLinks || '');
+                                  setAccountPhone(parsedDetails.phone || parsedDetails.accountPhone || '');
+                                  setAccountCountryFlag(parsedDetails.countryFlag || parsedDetails.accountCountryFlag || '');
+                                  setAccountNumberType(parsedDetails.numberType || parsedDetails.accountNumberType || '');
+                                }
+                              } catch(e) {}
+
+                              setEditingProduct(p);
+                              setCurrentWizardStep(2);
+                              setActiveModal('product');
+                            }}
+                            className="p-2 bg-slate-950 hover:bg-[#334155] text-yellow-400 border border-white/10 rounded-xl cursor-pointer"
+                            title="تعديل الحساب"
+                          >
+                            <Edit size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDeleteProduct(p.id)}
+                            className="p-2 bg-slate-950 hover:bg-[#ef4444]/15 text-red-500 border border-white/10 rounded-xl cursor-pointer"
+                            title="حذف"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              {products.filter(p => p.productType === 'account').length === 0 && (
+                <div className="col-span-2 py-16 text-center text-gray-500 text-xs bg-slate-900/20 border border-white/5 rounded-3xl">
+                  تصفية الفلتر فارغة، لا تتوفر أي حسابات للبيع مطابقة للخيار المختار.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 1.3 TAB: DETAILED FINANCIAL REPORTS */}
+        {activeTab === 'financials' && (() => {
+          const todayStr = new Date().toISOString().split('T')[0];
+          const thisMonthStr = new Date().toISOString().substring(0, 7);
+          const thisYearStr = new Date().toISOString().substring(0, 4);
+
+          const dailyCompletedOrders = completedOrders.filter(o => o.date && o.date.startsWith(todayStr));
+          const monthlyCompletedOrders = completedOrders.filter(o => o.date && o.date.startsWith(thisMonthStr));
+          const yearlyCompletedOrders = completedOrders.filter(o => o.date && o.date.startsWith(thisYearStr));
+
+          const actualDailyRevenue = dailyCompletedOrders.reduce((sum, o) => sum + (Number(o.price) || 0), 0);
+          const actualMonthlyRevenue = monthlyCompletedOrders.reduce((sum, o) => sum + (Number(o.price) || 0), 0);
+          const actualYearlyRevenue = yearlyCompletedOrders.reduce((sum, o) => sum + (Number(o.price) || 0), 0);
+
+          const dailyProfit = dailyCompletedOrders.reduce((sum, o) => sum + ((Number(o.price) || 0) * (Number(o.commission_rate || 15) / 100)), 0);
+          const monthlyProfit = monthlyCompletedOrders.reduce((sum, o) => sum + ((Number(o.price) || 0) * (Number(o.commission_rate || 15) / 100)), 0);
+          const yearlyProfit = yearlyCompletedOrders.reduce((sum, o) => sum + ((Number(o.price) || 0) * (Number(o.commission_rate || 15) / 100)), 0);
+
+          const avgOrderBasketValue = totalCompletedCount > 0 ? (grossIncome / totalCompletedCount) : 0;
+
+          return (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+              <div className="text-right">
+                <h2 className="text-sm font-black text-white flex items-center gap-1.5 justify-end">
+                  <span>التقارير المالية والتحليلات الضريبية</span>
+                  <DollarSign size={16} className="text-emerald-400" />
+                </h2>
+                <p className="text-[10px] text-gray-400 mt-0.5 font-sans">معدل الإيرادات الفعلية، الأرباح، والعمولات المقبوضة</p>
+              </div>
+
+              {/* Grid 1: Sales Gross Revenue by Duration */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 text-right">
+                <div className="bg-[#0f172a]/80 border border-indigo-500/10 p-4 rounded-3xl relative overflow-hidden">
+                  <span className="text-[10px] text-indigo-400 block mb-1 font-bold">المبيعات اليومية (اليوم)</span>
+                  <p className="text-lg font-black text-white font-mono">{actualDailyRevenue.toLocaleString('ar-EG')} د.ع</p>
+                  <p className="text-[9.5px] text-emerald-400 mt-1 font-sans">✓ صافي العمولة: {dailyProfit.toLocaleString('ar-EG')} د.ع</p>
+                </div>
+
+                <div className="bg-[#0c2e1b]/40 border border-emerald-500/10 p-4 rounded-3xl relative overflow-hidden">
+                  <span className="text-[10px] text-emerald-400 block mb-1 font-bold">المبيعات الشهرية (الشهر الحالي)</span>
+                  <p className="text-lg font-black text-emerald-400 font-mono">{actualMonthlyRevenue.toLocaleString('ar-EG')} د.ع</p>
+                  <p className="text-[9.5px] text-gray-300 mt-1 font-sans">✓ صافي العمولة: {monthlyProfit.toLocaleString('ar-EG')} د.ع</p>
+                </div>
+
+                <div className="bg-[#1e1b4b]/80 border border-amber-500/10 p-4 rounded-3xl relative overflow-hidden">
+                  <span className="text-[10px] text-amber-300 block mb-1 font-bold">المبيعات السنوية (العام الحالي)</span>
+                  <p className="text-lg font-black text-amber-400 font-mono">{actualYearlyRevenue.toLocaleString('ar-EG')} د.ع</p>
+                  <p className="text-[9.5px] text-gray-300 mt-1 font-sans">✓ صافي العمولة: {yearlyProfit.toLocaleString('ar-EG')} د.ع</p>
+                </div>
+              </div>
+
+              {/* Grid 2: Averages and vendor summaries */}
+              <div className="grid grid-cols-2 gap-3.5 text-right">
+                <div className="bg-slate-900/50 border border-white/5 p-4 rounded-2.5xl">
+                  <span className="text-[9px] text-gray-400 block mb-0.5 font-bold">متوسط حجم سلة الشراء (سلة العميل)</span>
+                  <p className="text-base font-extrabold text-white font-mono">{avgOrderBasketValue.toLocaleString('ar-EG')} د.ع</p>
+                </div>
+                <div className="bg-slate-900/50 border border-white/5 p-4 rounded-2.5xl">
+                  <span className="text-[9px] text-gray-400 block mb-0.5 font-bold">إجمالي الطلبات المكتملة</span>
+                  <p className="text-base font-extrabold text-white font-mono">{totalCompletedCount} طلب ناجح</p>
+                </div>
+              </div>
+
+              {/* Transactions Ledger Table */}
+              <div className="bg-slate-900/60 border border-white/5 rounded-3xl p-4 overflow-hidden space-y-3">
+                <h3 className="text-xs font-bold text-gray-300 text-right">أحدث التسويات والتحركات المالية بالبوابة</h3>
+
+                <div className="overflow-x-auto no-scrollbar">
+                  <table className="w-full text-right text-xs border-collapse divide-y divide-white/5" dir="rtl">
+                    <thead>
+                      <tr className="text-gray-400 font-bold text-[10px]">
+                        <th className="pb-2.5 text-right">المعاملة</th>
+                        <th className="pb-2.5 text-center">التاريخ والوقت</th>
+                        <th className="pb-2.5 text-center">المبلغ</th>
+                        <th className="pb-2.5 text-left">ملاحظات وقنوات الدفع</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {transactions.slice(0, 15).map((t) => {
+                        const isDeposit = t.type === 'deposit' || (t.amount > 0 && t.details?.includes('شحن'));
+                        return (
+                          <tr key={t.id} className="hover:bg-white/2 transition text-[10px]">
+                            <td className="py-3 font-bold text-white text-right">
+                              <div className="flex items-center gap-1.5 justify-start">
+                                {isDeposit ? (
+                                  <span className="bg-emerald-500/10 text-emerald-400 px-1 rounded text-[8px] font-bold">إيداع 🟢</span>
+                                ) : (
+                                  <span className="bg-red-500/10 text-red-400 px-1 rounded text-[8px] font-bold">خصم 🔴</span>
+                                )}
+                                <span>{t.details || 'حركة مالية لعميل'}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 text-center text-gray-400 font-sans">{t.timestamp ? new Date(t.timestamp).toLocaleDateString('ar-EG', {hour:'2-digit',minute:'2-digit'}) : 'منذ قليل'}</td>
+                            <td className="py-3 text-center font-mono font-black" style={{ color: isDeposit ? '#34d399' : '#f87171' }}>
+                              {isDeposit ? '+' : '-'}{(t.amount || 0).toLocaleString('ar-EG')} د.ع
+                            </td>
+                            <td className="py-3 text-left">
+                              <span className="text-gray-400">{t.paymentMethod === 'asiacell' ? 'شحن فوري آسياسيل ' : 'محفظة الزبون الذاتية'}</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {transactions.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="py-8 text-center text-gray-400 text-xs">
+                            لا تتوفر أي سجلات دفع أو تحويلات مالية حالية بقاعدة البيانات.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* 2. TAB: CATEGORIES MANAGER */}
-        {activeTab === 'categories' && (
+        {activeTab === 'settings' && activeSettingsSubTab === 'categories' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <button
@@ -1454,7 +2186,7 @@ export default function AdminDashboard({
         )}
 
         {/* 3. TAB: PRODUCTS INVENTORY */}
-        {activeTab === 'products' && (
+        {activeTab === 'settings' && activeSettingsSubTab === 'products' && (
           <div className="space-y-4">
             
             {/* Filter and Creators header */}
@@ -1532,7 +2264,7 @@ export default function AdminDashboard({
                     {/* Stock Quick updates and Prices row */}
                     <div className="grid grid-cols-2 bg-slate-950/40 p-2.5 rounded-xl text-[11px] items-center">
                       <div className="text-left font-mono">
-                        <span className="text-white text-xs font-bold">{p.price.toLocaleString('ar-EG')} د.ع</span>
+                        <span className="text-white text-xs font-bold">{(p.price ?? 0).toLocaleString('ar-EG')} د.ع</span>
                         {p.originalPrice && <span className="text-gray-500 line-through mr-1 text-[9px]">{p.originalPrice.toLocaleString('ar-EG')} د.ع</span>}
                       </div>
 
@@ -1575,7 +2307,7 @@ export default function AdminDashboard({
         )}
 
         {/* 4. TAB: COUPON DISCOUNTS WORKBOOK */}
-        {activeTab === 'coupons' && (
+        {activeTab === 'settings' && activeSettingsSubTab === 'coupons' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <button
@@ -1892,7 +2624,7 @@ export default function AdminDashboard({
         )}
 
         {/* 7. TAB: SUPPORT DESK ROOMS */}
-        {activeTab === 'chat' && (() => {
+        {activeTab === 'settings' && activeSettingsSubTab === 'chat' && (() => {
           // Drive unique conversation list sorted by latest
           const conversations = (() => {
             const map: { [key: string]: any } = {};
@@ -2178,7 +2910,7 @@ export default function AdminDashboard({
         })()}
 
         {/* 8. TAB: SEGMENT NOTIFICATION BROADCASTS */}
-        {activeTab === 'broadcast' && (
+        {activeTab === 'settings' && activeSettingsSubTab === 'broadcast' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <button
@@ -2253,7 +2985,7 @@ export default function AdminDashboard({
         )}
 
         {/* 9. TAB: HOMEPAGE SLIDES & BANNER ADS BUILDER */}
-        {activeTab === 'layout' && (
+        {activeTab === 'settings' && activeSettingsSubTab === 'layout' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <button
@@ -2303,7 +3035,7 @@ export default function AdminDashboard({
         )}
 
         {/* 10. TAB: SITE SETTINGS & LOOK */}
-        {activeTab === 'settings' && (
+        {activeTab === 'settings' && activeSettingsSubTab === 'identity' && (
           <div className="space-y-4">
             <h3 className="text-xs font-bold text-gray-300">تخصيص هوية وعلامة المتجر بالكامل</h3>
 
@@ -2439,7 +3171,7 @@ export default function AdminDashboard({
         )}
 
         {/* 11. TAB: BACKUP & OPERATIONAL ACTIONS LOG */}
-        {activeTab === 'system' && (
+        {activeTab === 'settings' && activeSettingsSubTab === 'system' && (
           <div className="space-y-4">
             
             <div className="bg-slate-900/50 border border-white/5 p-4 rounded-3xl space-y-4 text-right text-xs">
@@ -2479,419 +3211,762 @@ export default function AdminDashboard({
                       <span>{log.timestamp}</span>
                       <span className="text-cyan-400 font-extrabold">{log.adminName}</span>
                     </div>
-                    <div>
-                      <span className="bg-white/5 text-gray-300 px-1 py-0.5 rounded-sm font-bold text-[9px] ml-1">{log.actionType}</span>
-                      <span className="text-white leading-relaxed">{log.details}</span>
-                    </div>
+                    <span className="bg-white/5 text-gray-300 px-1 py-0.5 rounded-sm font-bold text-[9px] ml-1">{log.actionType}</span>
+                    <span className="text-white leading-relaxed">{log.details}</span>
                   </div>
                 ))}
-              </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-      </main>
+    </main>
 
-      {/* CORE POPUPS & MODALS DIALOGS */}
-      {activeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-950/85 backdrop-blur-md">
+    {/* CORE POPUPS & MODALS DIALOGS */}
+    {activeModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-950/85 backdrop-blur-md">
+        
+        <motion.div 
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className={`bg-slate-900 border border-white/10 rounded-3xl w-full p-5 space-y-4 overflow-y-auto max-h-[85vh] text-right ${activeModal === 'product' ? 'max-w-xl' : 'max-w-sm'}`}
+        >
           
-          <motion.div 
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-slate-900 border border-white/10 rounded-3xl max-w-sm w-full p-5 space-y-4 overflow-y-auto max-h-[85vh] text-right"
-          >
-            
-            <div className="flex items-center justify-between border-b border-white/5 pb-2">
-              <button onClick={() => setActiveModal(null)} className="p-1 hover:bg-white/5 rounded-full">
-                <X size={15} />
+          <div className="flex items-center justify-between border-b border-white/5 pb-2">
+            <button onClick={() => setActiveModal(null)} className="p-1 hover:bg-white/5 rounded-full">
+              <X size={15} />
+            </button>
+            <h3 className="text-xs font-extrabold text-white">
+              {activeModal === 'category' ? (editingCategory ? 'تعديل هذا القسم' : 'إضافة قسم للموقع') : ''}
+              {activeModal === 'product' ? (editingProduct ? 'تعديل وتلميق المنتج' : 'إضافة منتج رقمي متميز') : ''}
+              {activeModal === 'coupon' ? (editingCoupon ? 'تعديل شروط الكوبون' : 'صناعة كوبون ترويجي') : ''}
+              {activeModal === 'banner' ? (editingBanner ? 'تعديل البنر' : 'رفع إعلان السلايدر') : ''}
+              {activeModal === 'orderCredentials' ? 'تسليم بيانات الدخول الرقمية للزبون' : ''}
+              {activeModal === 'userEdit' ? 'تعديل محفظة ورتب صديق المتجر' : ''}
+            </h3>
+          </div>
+
+          {/* POPUP SUBVIEWS FORMS */}
+
+          {/* CATEGORY FORM */}
+          {activeModal === 'category' && (
+            <form onSubmit={saveCategory} className="space-y-3.5 text-xs">
+              <div>
+                <label className="text-[10px] text-gray-400">إسم القسم باللغة العربية</label>
+                <input
+                  type="text"
+                  value={catName}
+                  onChange={(e) => setCatName(e.target.value)}
+                  className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-right w-full mt-1 outline-none text-white focus:border-cyan-400"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-gray-400">ترتيب الظهور الفرزي</label>
+                  <input
+                    type="number"
+                    value={catOrder}
+                    onChange={(e) => setCatOrder(e.target.value)}
+                    className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-center w-full mt-1 outline-none text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-gray-400 font-bold block">التخطيط بالواجهة</label>
+                  <select
+                    value={catLayout}
+                    onChange={(e) => setCatLayout(e.target.value)}
+                    className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-right w-full mt-1 text-white outline-none"
+                  >
+                    <option value="vertical">عمودي (bento layout)</option>
+                    <option value="horizontal">أفقي (horizontal rows)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex gap-4 items-center justify-end py-1">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={catIsHidden}
+                    onChange={(e) => setCatIsHidden(e.target.checked)}
+                    className="rounded border-white/10Accent text-cyan-400"
+                  />
+                  <span className="text-gray-400 text-[10px]">إخفاء مؤقت من العرض</span>
+                </label>
+
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={catIsActive}
+                    onChange={(e) => setCatIsActive(e.target.checked)}
+                    className="rounded border-white/10Accent text-cyan-400"
+                  />
+                  <span className="text-gray-400 text-[10px]">نشط وفوري للجميع</span>
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-cyan-400 py-3 rounded-xl text-slate-950 font-black"
+              >
+                {isLoading ? 'جاري الفهرسة...' : 'حفظ القسم ببيانات التفعيل 📁'}
               </button>
-              <h3 className="text-xs font-extrabold text-white">
-                {activeModal === 'category' ? (editingCategory ? 'تعديل هذا القسم' : 'إضافة قسم للموقع') : ''}
-                {activeModal === 'product' ? (editingProduct ? 'تعديل وتلميق المنتج' : 'إضافة منتج رقمي متميز') : ''}
-                {activeModal === 'coupon' ? (editingCoupon ? 'تعديل شروط الكوبون' : 'صناعة كوبون ترويجي') : ''}
-                {activeModal === 'banner' ? (editingBanner ? 'تعديل البنر' : 'رفع إعلان السلايدر') : ''}
-                {activeModal === 'orderCredentials' ? 'تسليم بيانات الدخول الرقمية للزبون' : ''}
-                {activeModal === 'userEdit' ? 'تعديل محفظة ورتب صديق المتجر' : ''}
-              </h3>
-            </div>
+            </form>
+          )}
 
-            {/* POPUP SUBVIEWS FORMS */}
-
-            {/* CATEGORY FORM */}
-            {activeModal === 'category' && (
-              <form onSubmit={saveCategory} className="space-y-3.5 text-xs">
-                <div>
-                  <label className="text-[10px] text-gray-400">إسم القسم باللغة العربية</label>
-                  <input
-                    type="text"
-                    value={catName}
-                    onChange={(e) => setCatName(e.target.value)}
-                    className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-right w-full mt-1 outline-none text-white focus:border-cyan-400"
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] text-gray-400">ترتيب الظهور الفرزي</label>
-                    <input
-                      type="number"
-                      value={catOrder}
-                      onChange={(e) => setCatOrder(e.target.value)}
-                      className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-center w-full mt-1 outline-none text-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] text-gray-400 font-bold block">التخطيط بالواجهة</label>
-                    <select
-                      value={catLayout}
-                      onChange={(e) => setCatLayout(e.target.value)}
-                      className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-right w-full mt-1 text-white outline-none"
+          {/* PRODUCT FORM */}
+          {activeModal === 'product' && (
+              <form onSubmit={saveProduct} className="space-y-4 text-xs">
+                
+                {/* Wizard Headers */}
+                <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-2 select-none">
+                  {[3, 2, 1].map((step) => (
+                    <button
+                      key={step}
+                      type="button"
+                      onClick={() => setCurrentWizardStep(step)}
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[10px] font-bold border transition ${
+                        currentWizardStep === step
+                          ? "bg-cyan-400 text-slate-950 border-cyan-400"
+                          : "bg-slate-950 text-gray-400 border-white/10 hover:border-white/20"
+                      }`}
                     >
-                      <option value="vertical">عمودي (bento layout)</option>
-                      <option value="horizontal">أفقي (horizontal rows)</option>
-                    </select>
-                  </div>
+                      <span>الخطوة {step}</span>
+                      {step === 1 && <span className="opacity-80">(التصنيف)</span>}
+                      {step === 2 && <span className="opacity-80">(البيانات والنوع)</span>}
+                      {step === 3 && <span className="opacity-80">(المظهر والأسعار)</span>}
+                    </button>
+                  ))}
                 </div>
 
-                <div className="flex gap-4 items-center justify-end py-1">
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={catIsHidden}
-                      onChange={(e) => setCatIsHidden(e.target.checked)}
-                      className="rounded border-white/10Accent text-cyan-400"
-                    />
-                    <span className="text-gray-400 text-[10px]">إخفاء مؤقت من العرض</span>
-                  </label>
-
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={catIsActive}
-                      onChange={(e) => setCatIsActive(e.target.checked)}
-                      className="rounded border-white/10Accent text-cyan-400"
-                    />
-                    <span className="text-gray-400 text-[10px]">نشط وفوري للجميع</span>
-                  </label>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full bg-cyan-400 py-3 rounded-xl text-slate-950 font-black"
-                >
-                  {isLoading ? 'جاري الفهرسة...' : 'حفظ القسم ببيانات التفعيل 📁'}
-                </button>
-              </form>
-            )}
-
-            {/* PRODUCT FORM */}
-            {activeModal === 'product' && (
-              <form onSubmit={saveProduct} className="space-y-3.5 text-xs">
-                <div>
-                  <label className="text-[10px] text-gray-400">اسم المنتج والاشتراك الرقمي</label>
-                  <input
-                    type="text"
-                    value={prodName}
-                    onChange={(e) => setProdName(e.target.value)}
-                    className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-right w-full mt-1 outline-none text-white focus:border-cyan-400"
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] text-gray-400">سعر البيع (د.ع)</label>
-                    <input
-                      type="text"
-                      value={prodPrice}
-                      onChange={(e) => setProdPrice(e.target.value)}
-                      className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-center w-full mt-1 outline-none text-white"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-gray-400 text-right">السعر قبل الخصم (د.ع)</label>
-                    <input
-                      type="text"
-                      value={prodOriginalPrice}
-                      onChange={(e) => setProdOriginalPrice(e.target.value)}
-                      className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-center w-full mt-1 outline-none text-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] text-gray-400">القسم المعروض فيه</label>
-                    <select
-                      value={prodCategory}
-                      onChange={(e) => setProdCategory(e.target.value)}
-                      className="bg-slate-950 border border-white/10 rounded-xl py-2 px-2 text-right w-full mt-1 text-white"
-                    >
-                      {categories.map((c, idx) => (
-                        <option key={c.id || `product-cat-opt-${idx}`} value={c.id}>{c.name}</option>
-                      ))}
-                      {!categories.some(c => c.id === 'accounts') && <option value="accounts">حسابات مميزة</option>}
-                      {!categories.some(c => c.id === 'entertainment') && <option value="entertainment">اشتراكات ترفيه</option>}
-                      {!categories.some(c => c.id === 'productivity') && <option value="productivity">برامج إنتاجية</option>}
-                      {!categories.some(c => c.id === 'games') && <option value="games">خدمات الألعاب</option>}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-gray-400">مدة/نوع الاشتراك</label>
-                    <input
-                      type="text"
-                      value={prodPeriod}
-                      onChange={(e) => setProdPeriod(e.target.value)}
-                      placeholder="مثال: سنة كاملة بملف"
-                      className="bg-slate-950 border border-white/10 rounded-xl py-2 px-2 text-right w-full mt-1 text-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] text-gray-400">الكمية/المخزون المتوفر</label>
-                    <input
-                      type="number"
-                      value={prodStock}
-                      onChange={(e) => setProdStock(e.target.value)}
-                      className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-center w-full mt-1 text-white"
-                      disabled={prodProductType === 'auto_keys'}
-                    />
-                    {prodProductType === 'auto_keys' && <p className="text-[8px] text-amber-500 mt-1">يتم احتساب المخزون تلقائياً حسب عدد المفاتيح</p>}
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-gray-400">عمولة المتجر (%)</label>
-                    <input
-                      type="number"
-                      value={prodCommission}
-                      onChange={(e) => setProdCommission(e.target.value)}
-                      className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-center w-full mt-1 text-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5 space-y-3">
-                  <div>
-                    <label className="text-[10px] text-gray-400 font-bold text-amber-400">طريقة التسليم (نوع المنتج)</label>
-                    <select
-                      value={prodProductType}
-                      onChange={(e) => {
-                         setProdProductType(e.target.value);
-                         if (e.target.value === 'manual_id') {
-                           setProdRequirePlayerId(true);
-                         } else {
-                           setProdRequirePlayerId(false);
-                         }
-                      }}
-                      className="bg-slate-950 border border-cyan-400/30 rounded-xl py-2 px-2 text-right w-full mt-1 text-white"
-                    >
-                      <option value="standard">تسليم تلقائي (حسابات عشوائية جاهزة)</option>
-                      <option value="auto_keys">أكواد جاهزة (تسليم مفتاح من المخزون تلقائياً)</option>
-                      <option value="manual_id">شحن يدوي (العميل يزودنا بالـ ID أو رقم الحساب)</option>
-                    </select>
-                  </div>
-
-                  {prodProductType === 'auto_keys' && (
-                    <div className="animate-in fade-in zoom-in-95">
-                      <label className="text-[10px] text-green-400 font-bold">المخزون السري (أضف كود/مفتاح في كل سطر)</label>
-                      <textarea
-                        value={prodKeys}
-                        onChange={(e) => {
-                          setProdKeys(e.target.value);
-                          setProdStock(e.target.value.split('\n').filter(k => k.trim() !== '').length.toString());
+                {/* STEP 1: التصنيف الإلكتروني للسلعة الرقمية */}
+                {currentWizardStep === 1 && (
+                  <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                    <p className="text-[10px] text-gray-400 font-bold mb-1 block">الخطوة 1 - نوع ومجال المادة الرقمية:</p>
+                    
+                    <div className="grid grid-cols-2 gap-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProdTypeStep1('account');
+                          setProdProductType('account');
+                          setProdCategory('accounts');
                         }}
-                        rows={4}
-                        placeholder="KEY-123&#10;KEY-456&#10;user:pass"
-                        className="bg-slate-950 border border-green-500/30 rounded-xl py-2 px-3 text-left font-mono w-full mt-1 outline-none text-white focus:border-green-400"
-                        dir="ltr"
-                      />
-                      <p className="text-[10px] text-gray-500 mt-1 text-right">عدد المفاتيح الصالحة: {prodKeys.split('\n').filter(k=>k.trim() !== '').length}</p>
-                    </div>
-                  )}
-
-                  {prodProductType === 'manual_id' && (
-                    <div className="flex items-center justify-end gap-2 mt-2">
-                       <label className="text-xs text-white">إلزام العميل بإدخال الـ ID قبل الشراء</label>
-                       <input 
-                         type="checkbox" 
-                         checked={prodRequirePlayerId} 
-                         onChange={(e) => setProdRequirePlayerId(e.target.checked)}
-                         className="w-4 h-4 rounded text-cyan-500"
-                       />
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-[10px] bg-cyan-400/10 text-cyan-400 px-2 py-0.5 rounded-full font-bold">يمكنك رفع ملف أو كتابة رابط</span>
-                    <label className="text-[10px] text-gray-400">الصورة الرئيسية للمنتج</label>
-                  </div>
-                  <div className="flex gap-2 items-center mt-1">
-                    <input
-                      type="text"
-                      value={prodImageUrl}
-                      onChange={(e) => setProdImageUrl(e.target.value)}
-                      placeholder="https://images.unsplash.com/..."
-                      className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-left font-mono flex-1 text-white text-xs"
-                    />
-                    <label className="bg-cyan-400 text-slate-950 hover:bg-cyan-300 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                      </svg>
-                      <span>رفع صورة</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onloadend = () => {
-                              if (typeof reader.result === 'string') {
-                                setProdImageUrl(reader.result);
-                                showToast("تم الاستيراد من المعرض بنجاح! 📸");
-                              }
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-                    </label>
-                  </div>
-                  {prodImageUrl && (
-                    <div className="mt-2 flex items-center gap-2 bg-slate-950/20 p-1.5 rounded-xl border border-white/5">
-                      <img src={prodImageUrl} className="w-12 h-12 rounded object-cover border border-white/10" alt="" referrerPolicy="no-referrer" />
-                      <button 
-                        type="button" 
-                        onClick={() => setProdImageUrl('')}
-                        className="text-red-400 text-[10px] bg-red-400/10 px-2 py-1 rounded-md"
+                        className={`p-3.5 rounded-2xl border text-right flex flex-col gap-1.5 transition ${
+                          prodTypeStep1 === 'account'
+                            ? 'bg-amber-400/10 border-amber-400 text-amber-400'
+                            : 'bg-slate-950/40 border-white/5 text-gray-400 hover:border-white/20'
+                        }`}
                       >
-                        حذف الصورة
+                        <span className="text-xs font-black">👤 بيع حساب رقمي</span>
+                        <span className="text-[8px] opacity-75">حسابات ببجي، تيك توك، انستقرام أو تويتر تُباع لمرة واحدة وتحذف فوراً.</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProdTypeStep1('charge');
+                          setProdProductType('auto_keys');
+                          setProdCategory('games');
+                        }}
+                        className={`p-3.5 rounded-2xl border text-right flex flex-col gap-1.5 transition ${
+                          prodTypeStep1 === 'charge'
+                            ? 'bg-green-400/10 border-green-400 text-green-400'
+                            : 'bg-slate-950/40 border-white/5 text-gray-400 hover:border-white/20'
+                        }`}
+                      >
+                        <span className="text-xs font-black">🎮 شحن شدات ببجي (أكواد)</span>
+                        <span className="text-[8px] opacity-75">نظام الأكواد المتسلسلة التلقائي للفئات (60UC, 300UC, الخ) وبيع المفاتيح.</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProdTypeStep1('verification');
+                          setProdProductType('manual_id');
+                        }}
+                        className={`p-3.5 rounded-2xl border text-right flex flex-col gap-1.5 transition ${
+                          prodTypeStep1 === 'verification'
+                            ? 'bg-cyan-400/10 border-cyan-400 text-cyan-400'
+                            : 'bg-slate-950/40 border-white/5 text-gray-400 hover:border-white/20'
+                        }`}
+                      >
+                        <span className="text-xs font-black">🌐 توثيق وخدمات يدوية</span>
+                        <span className="text-[8px] opacity-75">خدمات رقمية تتطلب تزويدك باسم المستخدم أو الـ Player ID لإتمامها يدوياً.</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProdTypeStep1('tele_numbers');
+                          setProdProductType('account');
+                          setProdStep2Subtype('telegram_num');
+                          setProdCategory('accounts');
+                        }}
+                        className={`p-3.5 rounded-2xl border text-right flex flex-col gap-1.5 transition ${
+                          prodTypeStep1 === 'tele_numbers'
+                            ? 'bg-blue-400/10 border-blue-400 text-blue-400'
+                            : 'bg-slate-950/40 border-white/5 text-gray-400 hover:border-white/20'
+                        }`}
+                      >
+                        <span className="text-xs font-black">📞 أرقام تيليجرام</span>
+                        <span className="text-[8px] opacity-75">بيع أرقام تيليجرام مميزة وموثقة (راقي، استرالي، عراقي...) تسليم فوري وتلقائي.</span>
                       </button>
                     </div>
-                  )}
-                </div>
 
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-[10px] bg-cyan-400/10 text-cyan-400 px-2 py-0.5 rounded-full font-bold">اختياري: صور من معرضك تفصل بينها فاصلة</span>
-                    <label className="text-[10px] text-gray-400">صور إضافية للمنتج</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProdTypeStep1('others');
+                        setProdProductType('standard');
+                      }}
+                      className={`p-3 rounded-xl border text-center w-full block text-[10px] font-bold transition ${
+                        prodTypeStep1 === 'others'
+                          ? 'bg-white/10 border-white text-white'
+                          : 'bg-slate-950/20 border-white/10 text-gray-400'
+                      }`}
+                    >
+                      ⚙️ منتج عام آخر (تسليم تلقائي افتراضي / اشتراك عائلي)
+                    </button>
+
+                    <div className="flex justify-end pt-3">
+                      <button
+                        type="button"
+                        onClick={() => setCurrentWizardStep(2)}
+                        className="bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold px-6 py-2.5 rounded-xl text-xs flex items-center gap-1"
+                      >
+                        <span>الذهاب للخطوة التالية</span>
+                        <span>←</span>
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-2 items-center mt-1">
-                    <input
-                      type="text"
-                      value={prodExtraImages}
-                      onChange={(e) => setProdExtraImages(e.target.value)}
-                      placeholder="رابط صور مفرقة, رابط ثاني, رابط ثالث"
-                      className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-left font-mono flex-1 text-white text-xs"
-                    />
-                    <label className="bg-cyan-400 text-slate-950 hover:bg-cyan-300 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                      </svg>
-                      <span>رفع صور</span>
+                )}
+
+                {/* STEP 2: الخصائص وتفاصيل الحساب أو مفاتيح الشحن */}
+                {currentWizardStep === 2 && (
+                  <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 text-right">
+                    
+                    {prodTypeStep1 === 'account' && (
+                      <div className="p-4 bg-slate-950/40 rounded-2.5xl border border-white/10 space-y-3.5">
+                        <div>
+                          <label className="text-[10px] text-amber-400 font-bold block mb-1">الخطوة 2 - اختر نوع الحساب الرقمي المطلوب عرضه:</label>
+                          <select
+                            value={prodStep2Subtype}
+                            onChange={(e) => setProdStep2Subtype(e.target.value as any)}
+                            className="bg-slate-900 border border-white/10 rounded-xl py-2 px-3 text-right w-full text-white outline-none"
+                          >
+                            <option value="pubg">حساب PUBG Mobile</option>
+                            <option value="tiktok">حساب تيك توك (TikTok)</option>
+                            <option value="instagram">حساب انستغرام (Instagram)</option>
+                            <option value="twitter">حساب تويتر (Twitter / X)</option>
+                            <option value="telegram_chan">قناة تيليجرام (Telegram Channel)</option>
+                            <option value="telegram_num">رقم تيليجرام (Telegram Number)</option>
+                          </select>
+                        </div>
+
+                        {/* Dynamic fields based on subtype */}
+                        {prodStep2Subtype === 'pubg' && (
+                          <div className="space-y-2 pt-2 border-t border-white/5 animate-in fade-in">
+                            <p className="text-[10px] text-amber-400 font-bold">📝 حقول حساب PUBG المطلوبة:</p>
+                            <div>
+                              <label className="text-[9px] text-gray-400">اسم المستخدم (يوزر الحساب)</label>
+                              <input type="text" value={accountUsername} onChange={(e)=>setAccountUsername(e.target.value)} placeholder="مثال: PUBG_Player1" className="bg-slate-900 border border-white/10 px-3 py-2 text-right rounded-xl w-full text-white mt-1 outline-none focus:border-amber-400" required={prodStep2Subtype === 'pubg'} />
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400">ID اللاعب</label>
+                              <input type="text" value={accountPlayerId} onChange={(e)=>setAccountPlayerId(e.target.value)} placeholder="مثال: 541098801" className="bg-slate-900 border border-white/10 px-3 py-2 text-right rounded-xl w-full text-white mt-1 outline-none focus:border-amber-400" required={prodStep2Subtype === 'pubg'} />
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400">عدد الشدات المتوفرة أو الرانك الحالي</label>
+                              <input type="text" value={accountRankOrUc} onChange={(e)=>setAccountRankOrUc(e.target.value)} placeholder="مثال: 1200 شدة / الغازي" className="bg-slate-900 border border-white/10 px-3 py-2 text-right rounded-xl w-full text-white mt-1 outline-none focus:border-amber-400" required={prodStep2Subtype === 'pubg'} />
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400">الجيميل أو طريقة الربط المعتمدة للحساب</label>
+                              <input type="text" value={accountLinkedMethod} onChange={(e)=>setAccountLinkedMethod(e.target.value)} placeholder="مثال: Gmail + فيسبوك متصل" className="bg-slate-900 border border-white/10 px-3 py-2 text-right rounded-xl w-full text-white mt-1 outline-none focus:border-amber-400" required={prodStep2Subtype === 'pubg'} />
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400">كلمة سر الحساب (تُساق وتسلم للشاري تلقائياً بعد الدفع)</label>
+                              <input type="password" value={accountPassword} onChange={(e)=>setAccountPassword(e.target.value)} placeholder="•••••••••" className="bg-slate-900 border border-white/10 px-3 py-2 text-left rounded-xl w-full text-white mt-1 font-mono outline-none focus:border-amber-400" required={prodStep2Subtype === 'pubg'} />
+                            </div>
+                          </div>
+                        )}
+
+                        {prodStep2Subtype === 'tiktok' && (
+                          <div className="space-y-2 pt-2 border-t border-white/5 animate-in fade-in">
+                            <p className="text-[10px] text-amber-400 font-bold">📝 حقول حساب TikTok المطلوبة:</p>
+                            <div>
+                              <label className="text-[9px] text-gray-400">رابط الحساب أو اسم اليوزر</label>
+                              <input type="text" value={accountUsername} onChange={(e)=>setAccountUsername(e.target.value)} placeholder="مثال: @tiktok_star" className="bg-slate-900 border border-white/10 px-3 py-2 text-right rounded-xl w-full text-white mt-1 outline-none focus:border-amber-400" required={prodStep2Subtype === 'tiktok'} />
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400">عدد المتابعين</label>
+                              <input type="text" value={accountFollowers} onChange={(e)=>setAccountFollowers(e.target.value)} placeholder="مثال: 50K متابع" className="bg-slate-900 border border-white/10 px-3 py-2 text-right rounded-xl w-full text-white mt-1 outline-none focus:border-amber-400" required={prodStep2Subtype === 'tiktok'} />
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400">هل الحساب موثق بالعلامة الزرقاء؟</label>
+                              <select value={accountIsVerified} onChange={(e)=>setAccountIsVerified(e.target.value)} className="bg-slate-900 border border-white/10 px-3 py-2 text-right rounded-xl w-full text-white mt-1">
+                                <option value="no">لا، غير موثق</option>
+                                <option value="yes">نعم، موثق شارة زرقاء 🔵</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400">الحساب مربوط على (رقم، بريد إلكتروني...)</label>
+                              <input type="text" value={accountLinkedMethod} onChange={(e)=>setAccountLinkedMethod(e.target.value)} placeholder="بريد إلكتروني جيميل متاح بالكامل" className="bg-slate-900 border border-white/10 px-3 py-2 text-right rounded-xl w-full text-white mt-1 outline-none" required={prodStep2Subtype === 'tiktok'} />
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400">كلمة المرور السرية</label>
+                              <input type="password" value={accountPassword} onChange={(e)=>setAccountPassword(e.target.value)} placeholder="•••••••••" className="bg-slate-900 border border-white/10 px-3 py-2 text-left rounded-xl w-full text-white mt-1 font-mono outline-none" required={prodStep2Subtype === 'tiktok'} />
+                            </div>
+                          </div>
+                        )}
+
+                        {prodStep2Subtype === 'instagram' && (
+                          <div className="space-y-2 pt-2 border-t border-white/5 animate-in fade-in">
+                            <p className="text-[10px] text-amber-400 font-bold">📝 حقول حساب Instagram المطلوبة:</p>
+                            <div>
+                              <label className="text-[9px] text-gray-400">رابط الحساب</label>
+                              <input type="text" value={accountLink} onChange={(e)=>setAccountLink(e.target.value)} placeholder="instagram.com/username" className="bg-slate-900 border border-white/10 px-3 py-2 text-left rounded-xl w-full text-white mt-1 outline-none" required={prodStep2Subtype === 'instagram'} />
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400">اسم المستخدم (اليوزر)</label>
+                              <input type="text" value={accountUsername} onChange={(e)=>setAccountUsername(e.target.value)} placeholder="username" className="bg-slate-900 border border-white/10 px-3 py-2 text-right rounded-xl w-full text-white mt-1 outline-none" required={prodStep2Subtype === 'instagram'} />
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400">عدد المتابعين</label>
+                              <input type="text" value={accountFollowers} onChange={(e)=>setAccountFollowers(e.target.value)} placeholder="مثال: 120,000" className="bg-slate-900 border border-white/10 px-3 py-2 text-right rounded-xl w-full text-white mt-1 outline-none" required={prodStep2Subtype === 'instagram'} />
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400">هل الحساب موثق؟</label>
+                              <select value={accountIsVerified} onChange={(e)=>setAccountIsVerified(e.target.value)} className="bg-slate-900 border border-white/10 px-3 py-2 text-right rounded-xl w-full text-white mt-1">
+                                <option value="no">لا، غير موثق</option>
+                                <option value="yes">نعم، موثق شارة زرقاء 🔵</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400">طريقة الربط والبيانات الكاملة</label>
+                              <input type="text" value={accountLinkedMethod} onChange={(e)=>setAccountLinkedMethod(e.target.value)} placeholder="مربوط فيسبوك + ايميل اساسي متاح" className="bg-slate-900 border border-white/10 px-3 py-2 text-right rounded-xl w-full text-white mt-1 outline-none" required={prodStep2Subtype === 'instagram'} />
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400">كلمة المرور السرية</label>
+                              <input type="password" value={accountPassword} onChange={(e)=>setAccountPassword(e.target.value)} placeholder="•••••••••" className="bg-slate-900 border border-white/10 px-3 py-2 text-left rounded-xl w-full text-white mt-1 font-mono outline-none" required={prodStep2Subtype === 'instagram'} />
+                            </div>
+                          </div>
+                        )}
+
+                        {prodStep2Subtype === 'twitter' && (
+                          <div className="space-y-2 pt-2 border-t border-white/5 animate-in fade-in">
+                            <p className="text-[10px] text-amber-400 font-bold">📝 حقول حساب Twitter/X المطلوبة:</p>
+                            <div>
+                              <label className="text-[9px] text-gray-400">اليوزر الاسم (Username)</label>
+                              <input type="text" value={accountUsername} onChange={(e)=>setAccountUsername(e.target.value)} placeholder="x_star" className="bg-slate-900 border border-white/10 px-3 py-2 text-right rounded-xl w-full text-white mt-1 outline-none" required={prodStep2Subtype === 'twitter'} />
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400">رابط الحساب</label>
+                              <input type="text" value={accountLink} onChange={(e)=>setAccountLink(e.target.value)} placeholder="x.com/username" className="bg-slate-900 border border-white/10 px-3 py-2 text-left rounded-xl w-full text-white mt-1 outline-none" required={prodStep2Subtype === 'twitter'} />
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400">عدد المتابعين</label>
+                              <input type="text" value={accountFollowers} onChange={(e)=>setAccountFollowers(e.target.value)} placeholder="7.5K متابع" className="bg-slate-900 border border-white/10 px-3 py-2 text-right rounded-xl w-full text-white mt-1 outline-none" required={prodStep2Subtype === 'twitter'} />
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400">هل الحساب موثق؟</label>
+                              <select value={accountIsVerified} onChange={(e)=>setAccountIsVerified(e.target.value)} className="bg-slate-900 border border-white/10 px-3 py-2 text-right rounded-xl w-full text-white mt-1">
+                                <option value="no">لا، غير موثق</option>
+                                <option value="yes">نعم، موثق شارة ذهبية/زرقاء 🔵</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400">تأصيل الربط والايميل</label>
+                              <input type="text" value={accountLinkedMethod} onChange={(e)=>setAccountLinkedMethod(e.target.value)} placeholder="جيميل خارجي مرفوع الحماية" className="bg-slate-900 border border-white/10 px-3 py-2 text-right rounded-xl w-full text-white mt-1 outline-none" required={prodStep2Subtype === 'twitter'} />
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400">كلمة المرور السرية للحساب</label>
+                              <input type="password" value={accountPassword} onChange={(e)=>setAccountPassword(e.target.value)} placeholder="•••••••••" className="bg-slate-900 border border-white/10 px-3 py-2 text-left rounded-xl w-full text-white mt-1 font-mono outline-none" required={prodStep2Subtype === 'twitter'} />
+                            </div>
+                          </div>
+                        )}
+
+                        {prodStep2Subtype === 'telegram_chan' && (
+                          <div className="space-y-2 pt-2 border-t border-white/5 animate-in fade-in">
+                            <p className="text-[10px] text-amber-400 font-bold">📝 حقول قناة تيليجرام المطلوبة:</p>
+                            <div>
+                              <label className="text-[9px] text-gray-400">رابط القناة</label>
+                              <input type="text" value={accountLink} onChange={(e)=>setAccountLink(e.target.value)} placeholder="t.me/my_channel" className="bg-slate-900 border border-white/10 px-3 py-2 text-left rounded-xl w-full text-white mt-1 outline-none" required={prodStep2Subtype === 'telegram_chan'} />
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400">عدد المشتركين</label>
+                              <input type="text" value={accountFollowers} onChange={(e)=>setAccountFollowers(e.target.value)} placeholder="مثال: 12,000 عضو حقيقي" className="bg-slate-900 border border-white/10 px-3 py-2 text-right rounded-xl w-full text-white mt-1 outline-none" required={prodStep2Subtype === 'telegram_chan'} />
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400">هل يوجد بوتات بداخلها أو روابط منتهية الصلاحية؟</label>
+                              <input type="text" value={accountHasBotsOrLinks} onChange={(e)=>setAccountHasBotsOrLinks(e.target.value)} placeholder="مثال: القناة خالية من البوتات" className="bg-slate-900 border border-white/10 px-3 py-2 text-right rounded-xl w-full text-white mt-1 outline-none" required={prodStep2Subtype === 'telegram_chan'} />
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400">بيانات وتفاصيل نقل الملكية (تظهر للشاري بعد الشراء من محفظته)</label>
+                              <input type="text" value={accountPassword} onChange={(e)=>setAccountPassword(e.target.value)} placeholder="مثال: رمز الاسترداد أو رقم النقل الكامل" className="bg-slate-900 border border-white/10 px-3 py-2 text-right rounded-xl w-full text-white mt-1 outline-none" required={prodStep2Subtype === 'telegram_chan'} />
+                            </div>
+                          </div>
+                        )}
+
+                        {prodStep2Subtype === 'telegram_num' && (
+                          <div className="space-y-2 pt-2 border-t border-white/5 animate-in fade-in">
+                            <p className="text-[10px] text-amber-400 font-bold">📝 حقول أرقام التيليجرام المطلوبة:</p>
+                            <div>
+                              <label className="text-[9px] text-gray-400">الرقم المطلوب بيعه (مع الرمز الدولي)</label>
+                              <input type="text" value={accountPhone} onChange={(e)=>setAccountPhone(e.target.value)} placeholder="مثال: +1 (234) 567-8910" className="bg-slate-900 border border-white/10 px-3 py-2 text-left rounded-xl w-full text-white mt-1 font-mono outline-none focus:border-cyan-400" required={prodStep2Subtype === 'telegram_num'} />
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400">رمز وعلم الدولة (مثال: 🇺🇸 أمريكي، 🇮🇶 عراقي)</label>
+                              <input type="text" value={accountCountryFlag} onChange={(e)=>setAccountCountryFlag(e.target.value)} placeholder="علم ورمز الهاتف الدولي" className="bg-slate-900 border border-white/10 px-3 py-2 text-right rounded-xl w-full text-white mt-1 outline-none focus:border-cyan-400" required={prodStep2Subtype === 'telegram_num'} />
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400 font-bold block">نوع هذا الرقم</label>
+                              <input type="text" value={accountNumberType} onChange={(e)=>setAccountNumberType(e.target.value)} placeholder="مثال: رقم راقي ثلاثي، رقم افتراضي وهمي مميز" className="bg-slate-900 border border-white/10 px-3 py-2 text-right rounded-xl w-full text-white mt-1 outline-none focus:border-cyan-400" required={prodStep2Subtype === 'telegram_num'} />
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-gray-400 font-bold block">مفتاح نقل التفعيل / كلمة تفعيل الدخول المباشر</label>
+                              <input type="password" value={accountPassword} onChange={(e)=>setAccountPassword(e.target.value)} placeholder="كود تفعيل النقل السري" className="bg-slate-900 border border-white/10 px-3 py-2 text-left rounded-xl w-full text-white mt-1 font-mono outline-none focus:border-cyan-400" required={prodStep2Subtype === 'telegram_num'} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {prodTypeStep1 === 'charge' && (
+                      <div className="p-4 bg-slate-950/40 rounded-2.5xl border border-white/10 space-y-3.5 animate-in fade-in">
+                        <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl">
+                          <p className="text-[10px] text-emerald-400 font-extrabold text-right">⚙️ نظام الأكواد المتسلسلة لشدات ببجي PUBG UC</p>
+                          <p className="text-[8px] text-gray-300 text-right mt-1 font-sans">
+                            يرجى إضافة كود التعبئة الفردي في كل سطر منفصل. مثال: الكود الأول سيسلم للمشتري الأول، والكود الثاني للمشتري الثاني تلقائياً. كلما تتم عملية شراء لمنتج الشدات نفسه، يستلم الزبون رمزاً فريداً ومختلفاً.
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-green-400 font-bold block mb-1">صندوق الأكواد السري المخزن (مفتاح/كود في كل سطر):</label>
+                          <textarea
+                            value={prodKeys}
+                            onChange={(e) => {
+                              setProdKeys(e.target.value);
+                              setProdStock(e.target.value.split('\n').filter(k => k.trim() !== '').length.toString());
+                            }}
+                            rows={5}
+                            placeholder="UC-KEY-8153-902...&#10;UC-KEY-4421-209...&#10;UC-KEY-5192-301..."
+                            className="bg-slate-950 border border-green-500/30 rounded-xl py-2 px-3 text-left font-mono w-full mt-1 outline-none text-white focus:border-green-400 text-xs"
+                            dir="ltr"
+                          />
+                          <div className="flex justify-between items-center text-[10px] mt-1.5 text-gray-400">
+                            <span className="font-bold text-green-400 text-xs">{prodKeys.split('\n').filter(k => k.trim() !== '').length} كود جاهز في المخزون</span>
+                            <span>عدد الأكواد المدخلة حالياً</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {prodTypeStep1 === 'verification' && (
+                      <div className="p-4 bg-slate-950/40 rounded-2.5xl border border-white/10 space-y-3.5 animate-in fade-in">
+                        <div className="bg-cyan-500/10 border border-cyan-500/20 p-3 rounded-xl text-right">
+                          <p className="text-[10px] text-cyan-400 font-extrabold">🌐 نظام التوثيق والخدمات التي تتطلب معالجة يدوية</p>
+                          <p className="text-[8px] text-gray-300 mt-1">سيتعين على العميل إدخال الـ ID الخاص به أو يوزر حسابه عند الدفع لتتمكن كمسؤول من معالجة الطلب وتوثيقه يدوياً في لوحة الإدارة.</p>
+                        </div>
+                        <div className="flex items-center justify-between p-2 hover:bg-white/5 rounded-xl transition cursor-pointer" onClick={() => setProdRequirePlayerId(!prodRequirePlayerId)}>
+                          <input 
+                            type="checkbox" 
+                            checked={prodRequirePlayerId} 
+                            onChange={(e) => setProdRequirePlayerId(e.target.checked)}
+                            className="w-4 h-4 rounded text-cyan-500"
+                          />
+                          <label className="text-xs text-white cursor-pointer select-none">إلزام العميل بإدخال كود اللاعب (Player ID) قبل الشراء</label>
+                        </div>
+                      </div>
+                    )}
+
+                    {prodTypeStep1 === 'others' && (
+                      <div className="p-4 bg-slate-950/40 rounded-2.5xl border border-white/10 space-y-3.5 animate-in fade-in text-right">
+                        <div>
+                          <label className="text-[10px] text-gray-400 block mb-1 font-bold">نمط معالجة المنتج الرقمي العام:</label>
+                          <select
+                            value={prodProductType}
+                            onChange={(e) => setProdProductType(e.target.value as any)}
+                            className="bg-slate-900 border border-white/10 rounded-xl py-2 px-3 text-right w-full text-white outline-none"
+                          >
+                            <option value="standard">تسليم ومولد تلقائي (اشتراكات عامة كحسابات مفردة)</option>
+                            <option value="auto_keys">توزيع أكواد مفاتيح متسلسلة تلقائي من قائمتك</option>
+                            <option value="manual_id">معالجة يدوية كاملة بالطلب</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between pt-3">
+                      <button
+                        type="button"
+                        onClick={() => setCurrentWizardStep(3)}
+                        className="bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold px-6 py-2.5 rounded-xl text-xs flex items-center gap-1"
+                      >
+                        <span>الذهاب للخطوة التالية</span>
+                        <span>←</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setCurrentWizardStep(1)}
+                        className="text-gray-400 hover:text-white font-bold text-xs px-4"
+                      >
+                        السابق
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 3: الأسعار وعرض الواجهة */}
+                {currentWizardStep === 3 && (
+                  <div className="space-y-3.5 animate-in fade-in slide-in-from-bottom-2 text-right">
+                    <div>
+                      <label className="text-[10px] text-gray-400">اسم وسلاسل المنتج بالمتجر</label>
                       <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => {
-                          const files = Array.from(e.target.files || []) as File[];
-                          if (files.length > 0) {
-                            const newBase64s: string[] = [];
-                            let loadedCount = 0;
-                            files.forEach((file: File) => {
-                              const reader = new FileReader();
-                              reader.onloadend = () => {
-                                if (typeof reader.result === 'string') {
-                                  newBase64s.push(reader.result);
-                                }
-                                loadedCount++;
-                                if (loadedCount === files.length) {
-                                  const currentList = prodExtraImages.split(',').map(x => x.trim()).filter(Boolean);
-                                  const combinedList = [...currentList, ...newBase64s];
-                                  setProdExtraImages(combinedList.join(', '));
-                                  showToast(`تم رفع وإضافة ${files.length} صور إلى المعرض بنجاح! 📸`);
-                                }
-                              };
-                              reader.readAsDataURL(file);
-                            });
-                          }
-                        }}
+                        type="text"
+                        value={prodName}
+                        onChange={(e) => setProdName(e.target.value)}
+                        placeholder="مثال: حساب PUBG موبايل خرافي ليفل 80"
+                        className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-right w-full mt-1 outline-none text-white focus:border-cyan-400"
+                        required
                       />
-                    </label>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] text-gray-400">سعر البيع (د.ع)</label>
+                        <input
+                          type="text"
+                          value={prodPrice}
+                          onChange={(e) => setProdPrice(e.target.value)}
+                          className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-center w-full mt-1 outline-none text-white font-sans text-xs"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-gray-400 text-right">السعر قبل الخصم (د.ع)</label>
+                        <input
+                          type="text"
+                          value={prodOriginalPrice}
+                          onChange={(e) => setProdOriginalPrice(e.target.value)}
+                          className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-center w-full mt-1 outline-none text-white font-sans text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] text-gray-400">القسم المعروض فيه</label>
+                        <select
+                          value={prodCategory}
+                          onChange={(e) => setProdCategory(e.target.value)}
+                          className="bg-slate-950 border border-white/10 rounded-xl py-1.5 px-2 text-right w-full mt-1 text-white outline-none"
+                        >
+                          {categories.map((c, idx) => (
+                            <option key={c.id || `product-cat-opt-${idx}`} value={c.id}>{c.name}</option>
+                          ))}
+                          {!categories.some(c => c.id === 'accounts') && <option value="accounts">حسابات مميزة</option>}
+                          {!categories.some(c => c.id === 'entertainment') && <option value="entertainment">اشتراكات ترفيه</option>}
+                          {!categories.some(c => c.id === 'productivity') && <option value="productivity">برامج إنتاجية</option>}
+                          {!categories.some(c => c.id === 'games') && <option value="games">خدمات الألعاب</option>}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-gray-400">مدة/نوع الاشتراك</label>
+                        <input
+                          type="text"
+                          value={prodPeriod}
+                          onChange={(e) => setProdPeriod(e.target.value)}
+                          placeholder="مثال: تسليم فوري"
+                          className="bg-slate-950 border border-white/10 rounded-xl py-2 px-2 text-right w-full mt-1 text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] text-gray-400">الكمية/المخزون المتوفر</label>
+                        <input
+                          type="number"
+                          value={prodStock}
+                          onChange={(e) => setProdStock(e.target.value)}
+                          className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-center w-full mt-1 text-white font-sans"
+                          disabled={prodProductType === 'auto_keys' || prodProductType === 'account'}
+                        />
+                        {(prodProductType === 'auto_keys' || prodProductType === 'account') && (
+                          <p className="text-[7.5px] text-amber-500 mt-0.5">مخزون تلقائي حسب الحسابات/الأكواد المدخلة</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-gray-400">عمولة المتجر (%)</label>
+                        <input
+                          type="number"
+                          value={prodCommission}
+                          onChange={(e) => setProdCommission(e.target.value)}
+                          className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-center w-full mt-1 text-white font-sans"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-[9px] bg-cyan-400/10 text-cyan-400 px-2 py-0.5 rounded-full font-bold">رابط أو ملف كامل</span>
+                        <label className="text-[10px] text-gray-400">الصورة الرئيسية للمنتج</label>
+                      </div>
+                      <div className="flex gap-2 items-center mt-1">
+                        <input
+                          type="text"
+                          value={prodImageUrl}
+                          onChange={(e) => setProdImageUrl(e.target.value)}
+                          placeholder="https://images.unsplash.com/..."
+                          className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-left font-mono flex-1 text-white text-xs outline-none"
+                        />
+                        <label className="bg-cyan-400 text-slate-950 hover:bg-cyan-300 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                          </svg>
+                          رفع صورة
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  if (typeof reader.result === 'string') {
+                                    setProdImageUrl(reader.result);
+                                    showToast("تم الاستيراد من المعرض بنجاح! 📸");
+                                  }
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-[9px] bg-cyan-400/10 text-cyan-400 px-2 py-0.5 rounded-full font-bold font-sans">افصل بفارزة</span>
+                        <label className="text-[10px] text-gray-400">صور إضافية للمنتج (معرض الصور)</label>
+                      </div>
+                      <div className="flex gap-2 items-center mt-1">
+                        <input
+                          type="text"
+                          value={prodExtraImages}
+                          onChange={(e) => setProdExtraImages(e.target.value)}
+                          placeholder="رابط صور مفرقة, رابط ثاني, رابط ثالث"
+                          className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-left font-mono flex-1 text-white text-xs outline-none"
+                        />
+                        <label className="bg-cyan-400 text-slate-950 hover:bg-cyan-300 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                          </svg>
+                          رفع صور
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            onChange={(e) => {
+                              const files = Array.from(e.target.files || []) as File[];
+                              if (files.length > 0) {
+                                const newBase64s: string[] = [];
+                                let loadedCount = 0;
+                                files.forEach((file: File) => {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    if (typeof reader.result === 'string') {
+                                      newBase64s.push(reader.result);
+                                    }
+                                    loadedCount++;
+                                    if (loadedCount === files.length) {
+                                      const currentList = prodExtraImages.split(',').map(x => x.trim()).filter(Boolean);
+                                      const combinedList = [...currentList, ...newBase64s];
+                                      setProdExtraImages(combinedList.join(', '));
+                                      showToast(`تم رفع وإضافة ${files.length} صور إلى المعرض بنجاح! 📸`);
+                                    }
+                                  };
+                                  reader.readAsDataURL(file);
+                                });
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-gray-400">وصف وميزات المادة الرقمية (سطر منفرد لكل ميزة)</label>
+                      <textarea
+                        value={prodFeatures}
+                        onChange={(e) => setProdFeatures(e.target.value)}
+                        rows={3}
+                        placeholder="مميزات الحساب والضمان... أضف ميزة بكل سطر"
+                        className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-right w-full mt-1 outline-none text-white focus:border-cyan-400 text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-gray-400 font-sans">ملصق ملون ترويجي (Tag title)</label>
+                      <input
+                        type="text"
+                        value={prodTagText}
+                        onChange={(e) => setProdTagText(e.target.value)}
+                        placeholder="العرض الأقوى، خصم %20، الخ"
+                        className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-right w-full mt-1 text-white text-xs outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[10px] py-1">
+                      <label className="flex items-center gap-1.5 cursor-pointer justify-end">
+                        <span>تمييز كمنتج مميز ⭐</span>
+                        <input
+                          type="checkbox"
+                          checked={prodIsFeatured}
+                          onChange={(e) => setProdIsFeatured(e.target.checked)}
+                          className="rounded accent-cyan-400"
+                        />
+                      </label>
+
+                      <label className="flex items-center gap-1.5 cursor-pointer justify-end">
+                        <span>من الأكثر طلباً / مبيعاً 🔥</span>
+                        <input
+                          type="checkbox"
+                          checked={prodIsBestSeller}
+                          onChange={(e) => setProdIsBestSeller(e.target.checked)}
+                          className="rounded accent-cyan-400"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-3 gap-2">
+                      <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="flex-1 bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-black py-3 rounded-2xl text-xs shadow-lg shadow-cyan-400/10 active:scale-[0.98] transition-all"
+                      >
+                        {isLoading ? 'جاري الفهرسة والنشر...' : 'حفظ ونشر المادة الرقمية بالمتجر 🚀'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setCurrentWizardStep(2)}
+                        className="text-gray-400 hover:text-white font-bold text-xs px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl transition"
+                      >
+                        السابق
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <div>
-                  <label className="text-[10px] text-gray-400">رابط الفيديو التعريفي (العرض التجاري للمنتج)</label>
-                  <input
-                    type="text"
-                    value={prodVideoUrl}
-                    onChange={(e) => setProdVideoUrl(e.target.value)}
-                    placeholder="مثال: ملخص ميزات على اليوتيوب"
-                    className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-left font-mono w-full mt-1 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] text-gray-400">وصف وميزات الاشتراك الرقمي (سطر منفرد لكل ميزة)</label>
-                  <textarea
-                    value={prodFeatures}
-                    onChange={(e) => setProdFeatures(e.target.value)}
-                    rows={4}
-                    className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-right w-full mt-1 outline-none text-white focus:border-cyan-400"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-[10px]">
-                  <label className="flex items-center gap-1 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={prodIsFeatured}
-                      onChange={(e) => setProdIsFeatured(e.target.checked)}
-                      className="rounded accent-cyan-400"
-                    />
-                    <span>تمييز كمنتج مميز ⭐</span>
-                  </label>
-
-                  <label className="flex items-center gap-1 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={prodIsBestSeller}
-                      onChange={(e) => setProdIsBestSeller(e.target.checked)}
-                      className="rounded accent-cyan-400"
-                    />
-                    <span>من الأكثر طلباً / مبيعاً 🔥</span>
-                  </label>
-                </div>
-
-                <div>
-                  <label className="text-[10px] text-gray-400">ملصق ترويجي خاص بالمنتج (Tag label)</label>
-                  <input
-                    type="text"
-                    value={prodTagText}
-                    onChange={(e) => setProdTagText(e.target.value)}
-                    placeholder="مثال: الأكثر مبيعاً، خصم %30"
-                    className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 text-right w-full mt-1 text-white"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full bg-cyan-400 py-3 rounded-2xl text-slate-950 font-black text-xs"
-                >
-                  {isLoading ? 'جاري صناعة الاشتراك...' : 'حفظ ونشر المادّة الرقمية بالمتجر 🚀'}
-                </button>
               </form>
             )}
 
@@ -3205,7 +4280,7 @@ export default function AdminDashboard({
                     </select>
                   </div>
                   <div>
-                    <label className="text-[10px] text-gray-400">شحن الرصيد بموجب (ر.س)</label>
+                    <label className="text-[10px] text-gray-400">شحن الرصيد بموجب (د.ع)</label>
                     <input
                       type="number"
                       value={userBalanceState}

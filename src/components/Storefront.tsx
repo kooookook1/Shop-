@@ -122,13 +122,13 @@ export default function Storefront({
           </div>
 
           {/* User Balance Header Pill moved exactly next to URL/Logo as requested */}
-          {userBalance !== undefined && onRechargeClick && (
+          {userBalance !== undefined && userBalance !== null && onRechargeClick && (
             <div 
               onClick={onRechargeClick}
               className="flex items-center gap-1 bg-amber-400/10 border border-amber-400/30 hover:border-amber-400 px-2 py-0.5 rounded-full cursor-pointer transition-all active:scale-95 shadow-[0_0_8px_rgba(251,191,36,0.2)] font-sans select-none"
             >
               <span className="text-[10px] font-black text-amber-300 font-mono tracking-wide">
-                {userBalance.toLocaleString('ar-EG')} د.ع
+                {(Number(userBalance) || 0).toLocaleString('ar-EG')} د.ع
               </span>
               <div className="w-3.5 h-3.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] flex items-center justify-center pb-[1px] shadow-sm pointer-events-none shrink-0 leading-none">
                 +
@@ -207,8 +207,8 @@ export default function Storefront({
                     عرض مميز وحصري
                   </div>
                   <h2 className="text-sm font-black text-white">{slide.title}</h2>
-                  {product ? (
-                    <p className="text-[10px] text-cyan-400 font-bold">{product.price.toLocaleString('ar-EG')} د.ع / {product.period}</p>
+                  {product && product.price !== undefined && product.price !== null ? (
+                    <p className="text-[10px] text-cyan-400 font-bold">{(Number(product.price) || 0).toLocaleString('ar-EG')} د.ع / {product.period}</p>
                   ) : (
                     <p className="text-[10px] text-gray-400">تابع التفاصيل والشراء الفوري فوراً</p>
                   )}
@@ -302,8 +302,14 @@ export default function Storefront({
                   )}
 
                   {/* Stock tag */}
-                  <div className="absolute top-1 right-1 text-[8px] px-1 text-slate-400 font-medium">
-                    {p.stock > 0 ? `متوفر: ${p.stock}` : 'نفذت الكمية'}
+                  <div className="absolute top-1 right-1 text-[8.5px] px-1 text-slate-400 font-medium">
+                    {p.isSold || (p.productType === 'account' && (p.stock === 0 || (p as any).isSold)) ? (
+                      <span className="text-red-500 font-black">تم البيع ❌</span>
+                    ) : p.stock > 0 ? (
+                      `متوفر: ${p.stock}`
+                    ) : (
+                      <span className="text-amber-500 font-bold">(غير متاح حالياً)</span>
+                    )}
                   </div>
 
                   <div className="cursor-pointer space-y-2 mt-2" onClick={() => onSelectProduct(p)}>
@@ -356,24 +362,33 @@ export default function Storefront({
                         ⭐ {p.rating}
                       </span>
                       <p className="text-xs font-bold text-cyan-400">
-                        {p.price.toLocaleString('ar-EG')} <span className="text-[8px] text-gray-400 font-normal">د.ع</span>
+                        {(Number(p.price) || 0).toLocaleString('ar-EG')} <span className="text-[8px] text-gray-400 font-normal">د.ع</span>
                       </p>
                     </div>
                   </div>
 
                   {/* Fast action add to cart */}
                   <div className="pt-3 mt-1 border-t border-white/5 w-full">
-                    <motion.button
-                      whileTap={{ scale: 0.95 }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onAddToCart(p);
-                      }}
-                      className="w-full py-1.5 glass-button rounded-lg text-[10px] text-gray-300 font-semibold flex items-center justify-center gap-1.5"
-                    >
-                      <span>أضف إلى السلة</span>
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 inline-block"></span>
-                    </motion.button>
+                    {p.isSold || p.stock === 0 || (p.productType === 'account' && (p as any).isSold) ? (
+                      <button
+                        disabled
+                        className="w-full py-1.5 bg-slate-950/40 opacity-40 rounded-lg text-[10px] text-gray-500 font-semibold flex items-center justify-center gap-1.5 cursor-not-allowed"
+                      >
+                        <span>غير متاح ❌</span>
+                      </button>
+                    ) : (
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAddToCart(p);
+                        }}
+                        className="w-full py-1.5 glass-button rounded-lg text-[10px] text-gray-300 font-semibold flex items-center justify-center gap-1.5"
+                      >
+                        <span>أضف إلى السلة</span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 inline-block"></span>
+                      </motion.button>
+                    )}
                   </div>
                 </motion.div>
               );

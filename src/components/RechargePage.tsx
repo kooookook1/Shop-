@@ -10,6 +10,7 @@ interface RechargePageProps {
   userEmail: string;
   userBalance: number;
   onAddBalance?: (userId: string, amount: number) => void;
+  onSyncRequested?: () => void;
   onClose: () => void;
 }
 
@@ -19,6 +20,7 @@ export default function RechargePage({
   userEmail,
   userBalance,
   onAddBalance,
+  onSyncRequested,
   onClose
 }: RechargePageProps) {
   const [rechargeMethod, setRechargeMethod] = useState<'list' | 'asiacell'>('list');
@@ -153,8 +155,8 @@ export default function RechargePage({
         setAcMessage({ text: data.error, type: 'error' });
       } else if (data.success) {
         setAcMessage({ text: data.message, type: 'success' });
-        if (onAddBalance) {
-          onAddBalance(effectiveUserId, data.credited);
+        if (onSyncRequested) {
+          onSyncRequested();
         }
         setTimeout(() => {
           resetAsiacellWorkflow();
@@ -226,8 +228,8 @@ export default function RechargePage({
         setAcMessage({ text: data.error, type: 'error' });
       } else if (data.success) {
         setAcMessage({ text: data.message, type: 'success' });
-        if (onAddBalance) {
-          onAddBalance(effectiveUserId, data.credited);
+        if (onSyncRequested) {
+          onSyncRequested();
         }
         setTimeout(() => {
           resetAsiacellWorkflow();

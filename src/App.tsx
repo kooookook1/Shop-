@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Home, MessageCircle, ShoppingBag, User, Settings, ShieldAlert, HelpCircle } from 'lucide-react';
+import { Home, MessageCircle, ShoppingBag, User, Settings, ShieldAlert, HelpCircle, FileText } from 'lucide-react';
 import { Product, CartItem, Order, User as UserType, Transaction, Message } from './types';
 import { initialProducts, initialUsers, initialOrders, initialTransactions, initialMessages } from './data';
 import Notification from './components/Notification';
@@ -11,6 +11,7 @@ import Profile from './components/Profile';
 import RechargePage from './components/RechargePage';
 import SupportChat from './components/SupportChat';
 import AdminDashboard from './components/AdminDashboard';
+import { Purchases } from './components/Purchases';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
@@ -50,7 +51,7 @@ export default function App() {
   });
 
   // Tab View Controller State
-  const [activeTab, setActiveTab] = useState<'home' | 'support' | 'cart' | 'profile' | 'admin'>(() => {
+  const [activeTab, setActiveTab] = useState<'home' | 'support' | 'cart' | 'profile' | 'admin' | 'purchases'>(() => {
     try {
       const stored = localStorage.getItem('rixon_active_tab');
       return (stored as any) || 'home';
@@ -117,30 +118,54 @@ export default function App() {
   // 1. Core Synchronization Sync
   const syncAllData = async (userObj?: UserType) => {
     try {
+      // Helper to fetch JSON safely
+      const fetchJsonSafely = async (url: string, fallbackValue: any) => {
+        try {
+          const res = await fetch(url);
+          if (!res.ok) {
+            console.warn(`Request to ${url} failed with status: ${res.status}`);
+            return fallbackValue;
+          }
+          const contentType = res.headers.get("content-type");
+          if (!contentType || !contentType.includes("application/json")) {
+            console.warn(`Request to ${url} did not return JSON. Content-Type: ${contentType}`);
+            return fallbackValue;
+          }
+          const parsed = await res.json();
+          return parsed;
+        } catch (err) {
+          console.error(`Error parsing JSON from ${url}:`, err);
+          return fallbackValue;
+        }
+      };
+
       // Products
-      const prodRes = await fetch("/api/products");
-      const prodData = await prodRes.json();
-      setProducts(prodData);
+      const prodData = await fetchJsonSafely("/api/products", []);
+      if (Array.isArray(prodData)) {
+        setProducts(prodData);
+      }
 
       // Orders
-      const orderRes = await fetch("/api/orders");
-      const orderData = await orderRes.json();
-      setOrders(orderData);
+      const orderData = await fetchJsonSafely("/api/orders", []);
+      if (Array.isArray(orderData)) {
+        setOrders(orderData);
+      }
 
       // Users
-      const usersRes = await fetch("/api/users");
-      const usersData = await usersRes.json();
-      setUsers(usersData);
+      const usersData = await fetchJsonSafely("/api/users", []);
+      if (Array.isArray(usersData)) {
+        setUsers(usersData);
+      }
 
       // Transactions
-      const txRes = await fetch("/api/transactions");
-      const txData = await txRes.json();
-      setTransactions(txData);
+      const txData = await fetchJsonSafely("/api/transactions", []);
+      if (Array.isArray(txData)) {
+        setTransactions(txData);
+      }
 
       // Messages (scoped to logged-in user)
       const currentUId = userObj?.id || currentUserObjRef.current?.id || currentUserRef.current;
-      const msgRes = await fetch(`/api/messages?userId=${encodeURIComponent(currentUId)}`);
-      const msgData = await msgRes.json();
+      const msgData = await fetchJsonSafely(`/api/messages?userId=${encodeURIComponent(currentUId)}`, []);
       if (Array.isArray(msgData)) {
         setChatMessages(msgData);
       } else {
@@ -150,18 +175,41 @@ export default function App() {
 
       // Update current user balance if they are logged in
       const currentId = userObj?.id || currentUserObjRef.current?.id;
-      if (currentId) {
-        const foundUser = usersData.find((u: any) => u.id === currentId);
-        if (foundUser) {
-          setCurrentUserObj(foundUser);
-          const parsedBalance = typeof foundUser.balance === 'number' ? foundUser.balance : parseFloat(foundUser.balance);
-          setUserBalance(isNaN(parsedBalance) ? 0.00 : parsedBalance);
-        } else {
-          // If logged in user is no longer found in data, default to 0
-          setUserBalance(0.00);
+      const currentEmail = userObj?.email || currentUserObjRef.current?.email || (currentUserRef.current?.includes('@') ? currentUserRef.current : '');
+      const currentName = userObj?.name || currentUserObjRef.current?.name || (!currentUserRef.current?.includes('@') ? currentUserRef.current : '');
+
+      let foundUser: any = null;
+      if (Array.isArray(usersData) && usersData.length > 0) {
+        if (currentId) {
+          foundUser = usersData.find((u: any) => u.id === currentId);
+        }
+        if (!foundUser && currentEmail) {
+          foundUser = usersData.find((u: any) => u.email?.toLowerCase() === currentEmail.toLowerCase());
+        }
+        if (!foundUser && currentName) {
+          foundUser = usersData.find((u: any) => u.name === currentName);
+        }
+      }
+
+      if (foundUser) {
+        setCurrentUserObj(foundUser);
+        const parsedBalance = typeof foundUser.balance === 'number' ? foundUser.balance : parseFloat(foundUser.balance);
+        const newBalance = isNaN(parsedBalance) ? 0.00 : parsedBalance;
+        setUserBalance(newBalance);
+        
+        // Also update our refs and localStorage immediately to stay highly synchronized
+        currentUserObjRef.current = foundUser;
+        try {
+          localStorage.setItem('rixon_current_user_obj', JSON.stringify(foundUser));
+          localStorage.setItem('rixon_user_balance', String(newBalance));
+        } catch (e) {
+          console.error("Local storage error in syncAllData:", e);
         }
       } else {
-        setUserBalance(0.00);
+        // Only default to 0.00 if they are actually not logged in!
+        if (!isLoggedIn) {
+          setUserBalance(0.00);
+        }
       }
     } catch (err) {
       console.error("Error fetching synced data:", err);
@@ -272,10 +320,11 @@ export default function App() {
 
     // Check if user has sufficient balance
     const totalSpent = cartItems.reduce((acc, item) => {
-      const p = item.selectedPlan === 'yearly' ? item.product.price : parseFloat((item.product.price / 12).toFixed(2));
+      const isSub = (item.product?.category === 'entertainment' || item.product?.category === 'productivity') && item.product?.productType !== 'account' && item.product?.productType !== 'auto_keys';
+      const p = isSub ? (item.selectedPlan === 'yearly' ? item.product.price : parseFloat((item.product.price / 12).toFixed(2))) : item.product.price;
       return acc + (p * item.quantity);
     }, 0) - discountAmount;
-    const finalBillWithTax = totalSpent + (totalSpent * 0.15);
+    const finalBillWithTax = totalSpent;
 
     if (userBalance < finalBillWithTax) {
       showToast('عذراً، رصيدك الحالي غير كافٍ لإتمام عملية الشراء! يرجى شحن الرصيد.', 'info');
@@ -395,7 +444,7 @@ export default function App() {
       });
       const data = await res.json();
       if (!data.error) {
-        showToast(`تم شحن رصيد محفظتك بمبلغ ${amount} ر.س بنجاح! 🚀`, 'success');
+        showToast(`تم شحن رصيد محفظتك بمبلغ ${amount} د.ع بنجاح! 🚀`, 'success');
         await syncAllData();
       }
     } catch (err) {
@@ -529,6 +578,13 @@ export default function App() {
                   />
                 )}
 
+                {activeTab === 'purchases' && (
+                  <Purchases
+                    orders={orders}
+                    onCopyText={handleCopyText}
+                  />
+                )}
+
                 {activeTab === 'profile' && (
                   <Profile 
                     userName={currentUser}
@@ -583,6 +639,17 @@ export default function App() {
             >
               <User size={22} className={activeTab === 'profile' ? 'text-amber-400 scale-110' : ''} />
               <span className="text-[10px] font-sans">حسابي</span>
+            </button>
+
+            {/* Tab: Purchases */}
+            <button 
+              onClick={() => setActiveTab('purchases')}
+              className={`flex flex-col items-center gap-1 transition-all ${
+                activeTab === 'purchases' ? 'text-cyan-400 font-extrabold' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <FileText size={22} className={activeTab === 'purchases' ? 'text-cyan-400 scale-110' : ''} />
+              <span className="text-[10px]">مشترياتي</span>
             </button>
 
             {/* Tab: Cart */}
@@ -654,6 +721,7 @@ export default function App() {
               userEmail={currentUserObj?.email || 'kooookook1@gmail.com'}
               userBalance={userBalance}
               onAddBalance={handleAddBalance}
+              onSyncRequested={syncAllData}
               onClose={() => setProfileSubSection('none')}
             />
           )}

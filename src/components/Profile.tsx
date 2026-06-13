@@ -7,6 +7,21 @@ import {
 import { Order, Product } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 
+const ACCOUNT_FIELDS_ARABIC: Record<string, string> = {
+  accountSubtype: "نوع الحساب الفرعي",
+  usernameOrLink: "اليوزر أو رابط الملف الشخصي",
+  rankOrUc: "الرانك أو عدد الشدات",
+  linkedMethod: "طريقة ربط الحساب وتأمينه",
+  followers: "عدد المتابعين",
+  subscribers: "عدد المشتركين بالقناة",
+  isVerified: "حالة توثيق شارة زرقاء",
+  link: "رابط الحساب المفتوح",
+  hasBotsOrLinks: "تفاصيل الروبوتات والمسؤول المالك",
+  phone: "الرقم المخصص المربوط للتسليم",
+  countryCodeFlag: "علم الدولة والرمز",
+  numberType: "نوع رقم التيليجرام"
+};
+
 interface ProfileProps {
   userName: string;
   userBalance: number;
@@ -451,156 +466,7 @@ export default function Profile({
               </div>
             </header>
 
-            {/* USER ORDER DELIVERIES */}
-            <section className="px-4 space-y-4">
-              <div className="flex justify-between items-center select-none">
-                <span className="text-[10px] text-slate-400 font-medium font-sans">معلومات تسليم الحسابات فورية</span>
-                <h2 className="text-base font-bold text-white flex items-center gap-2">
-                  <FileText size={16} className="text-cyan-400" />
-                  <span>طلباتي الأخيرة</span>
-                </h2>
-              </div>
-
-              <div className="space-y-4">
-                {orders.length === 0 ? (
-                  <div className="glass-card rounded-2xl p-6 text-center text-gray-400 text-xs">
-                    لم تقم بأي طلبات شراء بعد. تسوق في المتجر لطلب مفاتيحك الرقمية!
-                  </div>
-                ) : (
-                  orders.map((order) => {
-                    const isDelivered = order.status === 'تم تسليم الطلب' || order.status === 'مكتمل';
-                    const showCredentialsBox = isDelivered && order.credentials;
-
-                    return (
-                      <div 
-                        key={order.id} 
-                        className={`glass-card rounded-3xl p-4 space-y-4 border border-white/5 relative overflow-hidden ${
-                          order.status === 'تم تسليم الطلب' ? 'border-l-4 border-l-amber-400' : ''
-                        }`}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex gap-3">
-                            <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center border border-white/5 overflow-hidden shrink-0">
-                              {order.imageUrl ? (
-                                <img 
-                                  src={order.imageUrl} 
-                                  alt={order.productName} 
-                                  referrerPolicy="no-referrer"
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <span className="text-cyan-400 font-extrabold text-xs">RX</span>
-                              )}
-                            </div>
-                            <div className="text-right">
-                              <h3 className="font-bold text-xs text-white leading-tight line-clamp-2 max-w-[160px]">{order.productName}</h3>
-                              <p className="text-[9px] text-gray-400 mt-1">{order.date} • رقم: #{order.id}</p>
-                            </div>
-                          </div>
-
-                          <div className="text-left shrink-0">
-                            <p className="text-xs font-black text-cyan-400">{(order.price ?? 0).toLocaleString('ar-EG')} د.ع</p>
-                            <div className={`flex items-center gap-1 mt-1 text-[9px] font-bold ${
-                              order.status === 'تم تسليم الطلب' ? 'text-amber-400' : 
-                              order.status === 'مكتمل' ? 'text-emerald-400' : 'text-red-400'
-                            }`}>
-                              <span>{order.status}</span>
-                              {isDelivered && <CheckCircle2 size={10} />}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* ACCOUNT CREDENTIALS HIGHLIGHTED BOX */}
-                        {showCredentialsBox && (
-                          <div className="glass-card rounded-2xl p-3.5 space-y-3 relative overflow-hidden">
-                            <div className="flex justify-between items-center text-[10px] text-gray-400 border-b border-white/5 pb-1.5 select-none animate-pulse">
-                              <span className="flex items-center gap-1"><Key size={10} /> بيانات حسابك جاهزة الآن</span>
-                              <span>معلومات التسليم الآمن</span>
-                            </div>
-
-                            {order.credentials?.username && (
-                              <div className="flex items-center justify-between text-xs">
-                                <button 
-                                  onClick={() => triggerCopy(order.credentials!.username!, 'اسم المستخدم', `${order.id}-user`)}
-                                  className="glass-button text-cyan-400 text-[10px] px-2.5 py-1 rounded-lg"
-                                >
-                                  {copiedId === `${order.id}-user` ? 'تم النسخ!' : 'نسخ'}
-                                </button>
-                                <span className="text-gray-300 text-right leading-tight break-all font-mono pl-3 selection:bg-amber-400">
-                                  {order.credentials.username} :<span className="text-gray-500 font-sans mr-1">المستخدم</span>
-                                </span>
-                              </div>
-                            )}
-
-                            {order.credentials?.password && (
-                              <div className="flex items-center justify-between text-xs">
-                                <button 
-                                  onClick={() => triggerCopy(order.credentials!.password!, 'كلمة المرور', `${order.id}-pw`)}
-                                  className="glass-button text-cyan-400 text-[10px] px-2.5 py-1 rounded-lg"
-                                >
-                                  {copiedId === `${order.id}-pw` ? 'تم النسخ!' : 'نسخ'}
-                                </button>
-                                <span className="text-gray-300 text-right leading-tight font-mono pl-3 selection:bg-amber-400">
-                                  {order.credentials.password} :<span className="text-gray-500 font-sans mr-1">كلمة المرور</span>
-                                </span>
-                              </div>
-                            )}
-
-                            {order.credentials?.code && (
-                              <div className="flex items-center justify-between text-xs">
-                                <button 
-                                  onClick={() => triggerCopy(order.credentials!.code!, 'كود التفعيل', `${order.id}-code`)}
-                                  className="glass-button text-amber-400 text-[10px] px-2.5 py-1 rounded-lg"
-                                >
-                                  {copiedId === `${order.id}-code` ? 'تم النسخ!' : 'نسخ الكود'}
-                                </button>
-                                <span className="text-gray-300 text-right leading-tight font-mono pl-3 selection:bg-amber-400">
-                                  {order.credentials.code} :<span className="text-gray-500 font-sans mr-1">الكود</span>
-                                </span>
-                              </div>
-                            )}
-                            {order.credentials?.keys && order.credentials.keys.map((key: string, idx: number) => (
-                              <div key={idx} className="flex items-center justify-between text-xs">
-                                <button 
-                                  onClick={() => triggerCopy(key, 'المفتاح', `${order.id}-key-${idx}`)}
-                                  className="glass-button text-amber-400 text-[10px] px-2.5 py-1 rounded-lg"
-                                >
-                                  {copiedId === `${order.id}-key-${idx}` ? 'تم النسخ!' : 'نسخ المفتاح'}
-                                </button>
-                                <span className="text-gray-300 text-right leading-tight font-mono pl-3 selection:bg-amber-400">
-                                  {key} :<span className="text-gray-500 font-sans mr-1">{order.credentials?.keys?.length === 1 ? 'المفتاح' : `المفتاح ${idx + 1}`}</span>
-                                </span>
-                              </div>
-                            ))}
-
-                            {order.credentials?.playerId && (
-                              <div className="flex items-center justify-between text-xs border border-white/5 rounded-lg border-dashed p-2 bg-slate-900/50">
-                                <span className="text-amber-400 font-bold ml-auto text-left leading-tight font-mono selection:bg-amber-400">
-                                  {order.credentials.playerId}
-                                </span>
-                                <span className="text-gray-400 text-right font-sans mr-1">معرف اللاعب المرفق:</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Delivery Confirmed Trigger */}
-                        {order.status === 'تم تسليم الطلب' && (
-                          <motion.button
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => onConfirmReceipt(order.id)}
-                            className="w-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold py-2.5 rounded-xl text-xs transition-colors shadow-md"
-                          >
-                            تم استلام الطلب وتأكيد الأمان
-                          </motion.button>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </section>
-
+            {/* THIS SECTION MOVED TO PURCHASES TAB */}
             {/* ADDITIONAL SETTINGS UTILITY NAVIGATION */}
             <section className="px-4 select-none">
               <div className="glass-card rounded-3xl overflow-hidden divide-y divide-white/5 border border-white/5">
@@ -730,7 +596,7 @@ export default function Profile({
                         </div>
                         <div className="text-right font-sans">
                           <h3 className="font-bold text-xs text-white leading-tight">{p.name}</h3>
-                          <p className="text-[10px] text-gray-400 mt-1">{p.price.toLocaleString('ar-EG')} د.ع</p>
+                          <p className="text-[10px] text-gray-400 mt-1">{(p.price ?? 0).toLocaleString('ar-EG')} د.ع</p>
                         </div>
                       </div>
 

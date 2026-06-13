@@ -14,9 +14,12 @@ export interface Product {
   features: string[];
   gradientClass?: string | null;
   commission_rate?: number; // Store commission % (e.g. 15%)
-  productType?: 'standard' | 'auto_keys' | 'manual_id';
+  productType?: 'standard' | 'auto_keys' | 'manual_id' | 'account';
   keys?: string[]; // Array of keys/codes for 'auto_keys' type
   requirePlayerId?: boolean;
+  accountDetails?: any;
+  isSold?: boolean;
+  extraImages?: string;
 }
 
 export interface User {
@@ -43,6 +46,7 @@ export interface Order {
     code?: string;
     keys?: string[];
     playerId?: string;
+    [key: string]: any;
   };
   imageUrl?: string;
   commission_rate?: number;
@@ -72,6 +76,11 @@ export interface Transaction {
   imageUrl?: string;
   store_share?: number;
   vendor_share?: number;
+  type?: string;
+  amount?: number;
+  details?: string;
+  timestamp?: string;
+  paymentMethod?: string;
 }
 
 export interface CartItem {
