@@ -1334,7 +1334,7 @@ app.get("/api/check-email", async (req, res) => {
 
 app.post("/api/login", async (req, res) => {
   try {
-    const { email, name, password, isRegistering, shippingCode } = req.body;
+    const { email, name, password, isRegistering } = req.body;
     if (!email) {
       return res.status(400).json({ error: "البريد الإلكتروني مطلوب" });
     }
@@ -1360,11 +1360,11 @@ app.post("/api/login", async (req, res) => {
       const balance = 0.0; // Starting/initial balance is zero
       
       await db.execute({
-        sql: "INSERT INTO rx_users (id, name, email, balance, joinDate, status, avatarLetter, password, shippingCode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        args: [id, cleanName, cleanEmail, balance, joinDate, "نشط", avatarLetter, password || "", shippingCode || ""]
+        sql: "INSERT INTO rx_users (id, name, email, balance, joinDate, status, avatarLetter, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        args: [id, cleanName, cleanEmail, balance, joinDate, "نشط", avatarLetter, password || ""]
       });
 
-      return res.json({ id, name: cleanName, email: cleanEmail, balance, joinDate, status: "نشط", avatarLetter, password: password || "", shippingCode: shippingCode || "" });
+      return res.json({ id, name: cleanName, email: cleanEmail, balance, joinDate, status: "نشط", avatarLetter, password: password || "" });
     } else {
       // Login flow
       if (check.rows.length > 0) {
@@ -1390,7 +1390,6 @@ app.post("/api/login", async (req, res) => {
           email: cleanEmail,
           avatarLetter,
           password: updatedPassword,
-          shippingCode: u.shippingCode || "",
           balance: Number(u.balance),
         });
       } else {

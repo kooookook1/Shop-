@@ -10,7 +10,6 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [shippingCode, setShippingCode] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [emailChecking, setEmailChecking] = useState(false);
@@ -60,7 +59,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
     try {
       if (isRegistering) {
         const name = fullName.trim() || email.split('@')[0] || 'مستشار ريكسون';
-        await onLogin(name, email, password, true, shippingCode.trim());
+        await onLogin(name, email, password, true);
       } else {
         const fallbackName = email ? email.split('@')[0] : 'أحمد محمد';
         await onLogin(fallbackName, email, password, false);
@@ -198,32 +197,6 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
               className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pr-12 pl-4 text-right text-sm placeholder-white/30 text-white focus:outline-none focus:ring-1 focus:ring-brand-gold hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
-
-          {isRegistering && (
-            <motion.div 
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              className="relative space-y-1 block overflow-hidden mt-1"
-            >
-              <div className="relative">
-                <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                  <Sparkles className="w-5 h-5 text-amber-400" />
-                </div>
-                <input 
-                  required
-                  disabled={isLoading}
-                  type="text" 
-                  placeholder="رمز الشحن الدائم الخاص بك" 
-                  value={shippingCode}
-                  onChange={(e) => setShippingCode(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pr-12 pl-4 text-right text-sm placeholder-[#94a3b8] text-white focus:outline-none focus:ring-1 focus:ring-[#fbbf24] hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-              </div>
-              <p className="text-[10px] text-[#fbbf24] text-right pr-2">
-                ⚠️ اختر رمزًا دائمًا لحفظ حسابك في قواعد بيانات ريكسون، لن يتغير ابداً ويستخدم لعمليات شحن الرموز وسحب الشدات!
-              </p>
-            </motion.div>
-          )}
 
           <motion.button 
             whileHover={isLoading ? {} : { scale: 1.02 }}

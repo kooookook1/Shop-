@@ -225,6 +225,12 @@ export default function App() {
 
   // Sync data automatically on mount or login
   React.useEffect(() => {
+    if (siteSettings?.siteName) {
+      document.title = siteSettings.siteName;
+    }
+  }, [siteSettings]);
+
+  React.useEffect(() => {
     if (isLoggedIn) {
       syncAllData();
       const interval = setInterval(() => syncAllData(), 5000); // poll every 5s for real-time transactions & chats
