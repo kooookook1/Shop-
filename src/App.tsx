@@ -51,6 +51,7 @@ export default function App() {
   });
 
   // Tab View Controller State
+  const [siteSettings, setSiteSettings] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'home' | 'support' | 'cart' | 'profile' | 'admin' | 'purchases'>(() => {
     try {
       const stored = localStorage.getItem('rixon_active_tab');
@@ -161,6 +162,12 @@ export default function App() {
       const txData = await fetchJsonSafely("/api/transactions", []);
       if (Array.isArray(txData)) {
         setTransactions(txData);
+      }
+
+      // Settings
+      const settingsData = await fetchJsonSafely("/api/settings", null);
+      if (settingsData) {
+        setSiteSettings(settingsData);
       }
 
       // Messages (scoped to logged-in user)
@@ -379,7 +386,7 @@ export default function App() {
   };
 
   // Chat message send loop via db
-  const handleSendMessage = async (text: string, image?: string) => {
+  const handleSendMessage = async (text: string, image?: string, replyToId?: string, replyToText?: string) => {
     try {
       const uId = currentUserObj?.id || currentUser;
       const userMsg = {
@@ -387,7 +394,9 @@ export default function App() {
         senderName: currentUser,
         text,
         userId: uId,
-        image: image || ''
+        image: image || '',
+        replyToId: replyToId || null,
+        replyToText: replyToText || null
       };
 
       // Add temporarily for clean fluid animation feeling
@@ -399,6 +408,8 @@ export default function App() {
         text,
         userId: uId,
         image: image || '',
+        replyToId,
+        replyToText,
         timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
       }]);
 
@@ -588,6 +599,7 @@ export default function App() {
                     onSendMessage={handleSendMessage}
                     onBackToStore={() => setActiveTab('home')}
                     userId={currentUserObj?.id || currentUser}
+                    supportAvatarUrl={siteSettings?.supportAvatarUrl}
                   />
                 )}
 
@@ -633,7 +645,7 @@ export default function App() {
                   />
                 )}
 
-                {activeTab === 'admin' && (
+                {activeTab === 'admin' && currentUserObj?.email === 'zero@gmail.com' && (
                   <AdminDashboard 
                     products={products}
                     users={users}
@@ -714,15 +726,17 @@ export default function App() {
              </button>
 
             {/* Tab: Admin Dashboard */}
-            <button 
-              onClick={() => setActiveTab('admin')}
-              className={`flex flex-col items-center gap-1 transition-all ${
-                activeTab === 'admin' ? 'text-cyan-400 font-extrabold' : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              <Settings size={22} className={activeTab === 'admin' ? 'text-cyan-400 scale-110' : ''} />
-              <span className="text-[10px]">لوحةالتحكم</span>
-            </button>
+            {currentUserObj?.email === 'zero@gmail.com' && (
+              <button 
+                onClick={() => setActiveTab('admin')}
+                className={`flex flex-col items-center gap-1 transition-all ${
+                  activeTab === 'admin' ? 'text-cyan-400 font-extrabold' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Settings size={22} className={activeTab === 'admin' ? 'text-cyan-400 scale-110' : ''} />
+                <span className="text-[10px]">لوحةالتحكم</span>
+              </button>
+            )}
 
             {/* Tab: Home Storefront */}
             <button 

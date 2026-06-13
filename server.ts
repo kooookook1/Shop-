@@ -151,7 +151,8 @@ async function initDatabase() {
         privacyPage TEXT,
         socialTwitter TEXT,
         socialTelegram TEXT,
-        socialWhatsapp TEXT
+        socialWhatsapp TEXT,
+        supportAvatarUrl TEXT DEFAULT 'https://lh3.googleusercontent.com/aida-public/AB6AXuCmM4ZtcoZniNa-JQQnD_zy1K_5zAInZDJ6vj_LjGyr-BdCrpRaup5N9TPzQA9GeuajgqXcTYBcVwKQ0ZNcx4MYetSo7uhEYhz7KT6O3vFNzMn2zvoFyN_8w_TZw2GAD_b3sEFbiOH5pGOfK5cciSCy7vtAKFH63jETSus7c3Qjp2wJwZ3vCx-Hl2tDwybyxH33iB9EnRs-LVvGoJLDiJwqmt_6MsOj4HGkoFQYF4WEqXMMjOILF026U-TsnK_uWDWWVsEbZE-bxIzT'
       )
     `);
 
@@ -253,6 +254,12 @@ async function initDatabase() {
     } catch (e) {
       console.log('Error adding isRead column:', e);
     }
+    try {
+      await db.execute("ALTER TABLE rx_messages ADD COLUMN replyToId TEXT");
+      await db.execute("ALTER TABLE rx_messages ADD COLUMN replyToText TEXT");
+    } catch (e) {
+      console.log('Error adding reply fields:', e);
+    }
 
     // Safe Schema Alterations to rx_site_settings table for Asiacell configuration
     try {
@@ -260,6 +267,9 @@ async function initDatabase() {
     } catch (e) {}
     try {
       await db.execute("ALTER TABLE rx_site_settings ADD COLUMN asiacellRate REAL DEFAULT 350.0");
+    } catch (e) {}
+    try {
+      await db.execute("ALTER TABLE rx_site_settings ADD COLUMN supportAvatarUrl TEXT DEFAULT 'https://lh3.googleusercontent.com/aida-public/AB6AXuCmM4ZtcoZniNa-JQQnD_zy1K_5zAInZDJ6vj_LjGyr-BdCrpRaup5N9TPzQA9GeuajgqXcTYBcVwKQ0ZNcx4MYetSo7uhEYhz7KT6O3vFNzMn2zvoFyN_8w_TZw2GAD_b3sEFbiOH5pGOfK5cciSCy7vtAKFH63jETSus7c3Qjp2wJwZ3vCx-Hl2tDwybyxH33iB9EnRs-LVvGoJLDiJwqmt_6MsOj4HGkoFQYF4WEqXMMjOILF026U-TsnK_uWDWWVsEbZE-bxIzT'");
     } catch (e) {}
 
     // Seed default Categories
@@ -1110,10 +1120,10 @@ app.get("/api/settings", async (req, res) => {
 
 app.post("/api/settings", async (req, res) => {
   try {
-    const { siteName, logoUrl, faviconUrl, primaryColor, termsPage, privacyPage, socialTwitter, socialTelegram, socialWhatsapp, asiacellPhone, asiacellRate } = req.body;
+    const { siteName, logoUrl, faviconUrl, primaryColor, termsPage, privacyPage, socialTwitter, socialTelegram, socialWhatsapp, asiacellPhone, asiacellRate, supportAvatarUrl } = req.body;
     await db.execute({
       sql: `UPDATE rx_site_settings 
-            SET siteName = ?, logoUrl = ?, faviconUrl = ?, primaryColor = ?, termsPage = ?, privacyPage = ?, socialTwitter = ?, socialTelegram = ?, socialWhatsapp = ?, asiacellPhone = ?, asiacellRate = ?
+            SET siteName = ?, logoUrl = ?, faviconUrl = ?, primaryColor = ?, termsPage = ?, privacyPage = ?, socialTwitter = ?, socialTelegram = ?, socialWhatsapp = ?, asiacellPhone = ?, asiacellRate = ?, supportAvatarUrl = ?
             WHERE id = 'main'`,
       args: [
         siteName, 
@@ -1126,7 +1136,8 @@ app.post("/api/settings", async (req, res) => {
         socialTelegram || "", 
         socialWhatsapp || "",
         asiacellPhone || "",
-        Number(asiacellRate) || 350.0
+        Number(asiacellRate) || 350.0,
+        supportAvatarUrl || "https://lh3.googleusercontent.com/aida-public/AB6AXuCmM4ZtcoZniNa-JQQnD_zy1K_5zAInZDJ6vj_LjGyr-BdCrpRaup5N9TPzQA9GeuajgqXcTYBcVwKQ0ZNcx4MYetSo7uhEYhz7KT6O3vFNzMn2zvoFyN_8w_TZw2GAD_b3sEFbiOH5pGOfK5cciSCy7vtAKFH63jETSus7c3Qjp2wJwZ3vCx-Hl2tDwybyxH33iB9EnRs-LVvGoJLDiJwqmt_6MsOj4HGkoFQYF4WEqXMMjOILF026U-TsnK_uWDWWVsEbZE-bxIzT"
       ]
     });
     res.json({ success: true });
@@ -1186,12 +1197,12 @@ app.post("/api/broadcasts", async (req, res) => {
 // 1.7 ADMIN MESSAGING DIRECT ACTIONS
 app.post("/api/admin/reply-message", async (req, res) => {
   try {
-    const { text, adminName, userId, image } = req.body;
-    const replyId = `msg-reply-${Date.now()}`;
+    const { text, adminName, userId, image, replyToId, replyToText } = req.body;
+    const replyId = `msg-${Date.now()}-reply`;
     const timestamp = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     await db.execute({
-      sql: "INSERT INTO rx_messages (id, sender, senderName, text, timestamp, userId, image, isRead) VALUES (?, ?, ?, ?, ?, ?, ?, 0)",
-      args: [replyId, 'agent', adminName || "خالد العمري", text || '', timestamp, userId || '', image || '']
+      sql: "INSERT INTO rx_messages (id, sender, senderName, text, timestamp, userId, image, isRead, replyToId, replyToText) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)",
+      args: [replyId, 'agent', adminName || "خالد العمري", text || '', timestamp, userId || '', image || '', replyToId || null, replyToText || null]
     });
     res.json({ success: true, id: replyId, timestamp });
   } catch (error: any) {
@@ -2496,14 +2507,14 @@ app.post("/api/asiacell/balance", async (req, res) => {
 
 app.post("/api/messages", async (req, res) => {
   try {
-    const { sender, senderName, text, userId, image } = req.body;
+    const { sender, senderName, text, userId, image, replyToId, replyToText } = req.body;
     const msgId = `msg-${Date.now()}`;
     const timestamp = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
     // Store user message
     await db.execute({
-      sql: "INSERT INTO rx_messages (id, sender, senderName, text, timestamp, userId, image, isRead) VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
-      args: [msgId, sender, senderName, text || '', timestamp, userId || senderName, image || '']
+      sql: "INSERT INTO rx_messages (id, sender, senderName, text, timestamp, userId, image, isRead, replyToId, replyToText) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)",
+      args: [msgId, sender, senderName, text || '', timestamp, userId || senderName, image || '', replyToId || null, replyToText || null]
     });
 
     // Generate responsive bot agent replay
@@ -2517,7 +2528,7 @@ app.post("/api/messages", async (req, res) => {
       replyText = 'الاشتراكات ممتازة ومثبتة وبضمان رسمي معتمد. يسعدنا اختيارك وبإمكانك إتمام الدفع بأمان تام لتصلك البيانات بلحظتها.';
     }
 
-    const replyId = `msg-reply-${Date.now()}`;
+    const replyId = `msg-${Date.now()}-reply`;
     const replyTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
     // Store reply in db as unread for the user (isRead = 0)

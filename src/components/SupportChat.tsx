@@ -1,19 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronRight, Send, Image as ImageIcon, X, HelpCircle, Loader2, Maximize2 } from 'lucide-react';
+import { ChevronRight, Send, Image as ImageIcon, X, HelpCircle, Loader2, Maximize2, Reply } from 'lucide-react';
 import { Message } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface SupportChatProps {
   messages: Message[];
-  onSendMessage: (text: string, image?: string) => void;
+  onSendMessage: (text: string, image?: string, replyToId?: string, replyToText?: string) => void;
   onBackToStore: () => void;
   userId?: string;
+  supportAvatarUrl?: string;
 }
 
-export default function SupportChat({ messages, onSendMessage, onBackToStore, userId }: SupportChatProps) {
+export default function SupportChat({ messages, onSendMessage, onBackToStore, userId, supportAvatarUrl }: SupportChatProps) {
   const [inputText, setInputText] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [zoomImage, setZoomImage] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -45,11 +47,12 @@ export default function SupportChat({ messages, onSendMessage, onBackToStore, us
     if (!inputText.trim() && !selectedImage) return;
     
     // Call onSendMessage with both text and image
-    onSendMessage(inputText.trim(), selectedImage || undefined);
+    onSendMessage(inputText.trim(), selectedImage || undefined, replyingTo?.id, replyingTo?.text);
     
     // Reset states
     setInputText('');
     setSelectedImage(null);
+    setReplyingTo(null);
   };
 
   const handleQuickAction = (text: string) => {
@@ -99,14 +102,14 @@ export default function SupportChat({ messages, onSendMessage, onBackToStore, us
               <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
             </p>
           </div>
-          <div className="relative">
+          <div className="relative p-0.5 rounded-full bg-gradient-to-tr from-cyan-500 to-emerald-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]">
             <img 
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuDMnUSFqirx6s5peLr3xsrkhVxEgzkkD2mFMXoYzytUEyIh_x2ZuMGK0OCj9JID-jVaxWkYWrj7Iez6hNk05PZcJv7FfViavTKp8GLbnBZ4wcjT4ewfV4SQarjPlEnPkV9G3xXsHJgx4HrC82Gsoft-5kKuAsOXFRn9XvpEuMGvaxBWTbnrXagngMhEj4f9McMO4LtDLVUx4lO63f0v7OLuDzN2nETwCm9tWnHNhOHld8b_4Z6NbceO17ZGX_gXQ_hh24ceam20vFc1" 
+              src={supportAvatarUrl || "https://lh3.googleusercontent.com/aida-public/AB6AXuCmM4ZtcoZniNa-JQQnD_zy1K_5zAInZDJ6vj_LjGyr-BdCrpRaup5N9TPzQA9GeuajgqXcTYBcVwKQ0ZNcx4MYetSo7uhEYhz7KT6O3vFNzMn2zvoFyN_8w_TZw2GAD_b3sEFbiOH5pGOfK5cciSCy7vtAKFH63jETSus7c3Qjp2wJwZ3vCx-Hl2tDwybyxH33iB9EnRs-LVvGoJLDiJwqmt_6MsOj4HGkoFQYF4WEqXMMjOILF026U-TsnK_uWDWWVsEbZE-bxIzT"} 
               alt="Support Agent" 
               referrerPolicy="no-referrer"
-              className="w-10 h-10 rounded-full border border-white/10 object-cover object-top"
+              className="w-10 h-10 rounded-full border border-slate-950 object-cover object-top"
             />
-            <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-950 rounded-full"></div>
+            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-slate-950 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></div>
           </div>
         </div>
       </header>
@@ -136,19 +139,39 @@ export default function SupportChat({ messages, onSendMessage, onBackToStore, us
                     transition={{ duration: 0.2 }}
                     className={`flex ${isAgent ? 'justify-start' : 'justify-end'}`}
                   >
-                    <div className={`relative max-w-[85%] rounded-2xl p-3 shadow-md border ${
+                    <div className="flex items-center gap-2">
+                       {/* Add quick reply button next to message if user wants to reply */}
+                       {!isAgent && (
+                         <button onClick={() => setReplyingTo(msg)} className="text-gray-500 hover:text-white transition-colors">
+                            <Reply size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                         </button>
+                       )}
+                    <div className={`relative max-w-[85%] rounded-2xl p-3 shadow-md border group ${
                       isAgent 
                         ? 'bg-slate-900/90 border-[#52579b]/20 text-white rounded-tr-none' 
                         : 'bg-cyan-500 text-slate-950 border-cyan-400/20 rounded-tl-none font-medium'
                     }`}>
                       {isAgent && (
-                        <p className="font-extrabold text-[9px] text-cyan-400 opacity-90 mb-1">
-                          {msg.senderName}
-                        </p>
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <img 
+                            src={supportAvatarUrl || "https://lh3.googleusercontent.com/aida-public/AB6AXuCmM4ZtcoZniNa-JQQnD_zy1K_5zAInZDJ6vj_LjGyr-BdCrpRaup5N9TPzQA9GeuajgqXcTYBcVwKQ0ZNcx4MYetSo7uhEYhz7KT6O3vFNzMn2zvoFyN_8w_TZw2GAD_b3sEFbiOH5pGOfK5cciSCy7vtAKFH63jETSus7c3Qjp2wJwZ3vCx-Hl2tDwybyxH33iB9EnRs-LVvGoJLDiJwqmt_6MsOj4HGkoFQYF4WEqXMMjOILF026U-TsnK_uWDWWVsEbZE-bxIzT"} 
+                            className="w-4 h-4 rounded-full object-cover" 
+                            referrerPolicy="no-referrer"
+                          />
+                          <p className="font-extrabold text-[9px] text-cyan-400 opacity-90">
+                            {msg.senderName || 'الدعم الفني'}
+                          </p>
+                        </div>
+                      )}
+                      
+                      {msg.replyToText && (
+                        <div className="mb-2 bg-slate-950/40 border-r-2 border-white/30 pr-2 py-1 rounded text-[9px] text-white/70 w-full line-clamp-1 italic text-right leading-relaxed block max-w-full">
+                          {msg.replyToText}
+                        </div>
                       )}
                       
                       {/* Attached Image presentation */}
-                      {msg.image && (
+                      {msg.image && ( 
                         <div className="relative rounded-lg overflow-hidden border border-white/10 mb-2 max-w-[200px] group cursor-zoom-in">
                           <img 
                             src={msg.image} 
@@ -169,6 +192,12 @@ export default function SupportChat({ messages, onSendMessage, onBackToStore, us
                       <div className={`text-[8px] mt-1.5 text-left ${isAgent ? 'text-gray-400' : 'text-slate-800'}`}>
                         {msg.timestamp}
                       </div>
+                    </div>
+                       {isAgent && (
+                         <button onClick={() => setReplyingTo(msg)} className="text-gray-500 hover:text-white transition-colors focus:outline-none shrink-0 group">
+                            <Reply size={14} className="opacity-0 group-hover:opacity-100 transition-opacity scale-x-[-1]" />
+                         </button>
+                       )}
                     </div>
                   </motion.div>
                 );
@@ -204,8 +233,22 @@ export default function SupportChat({ messages, onSendMessage, onBackToStore, us
         </div>
 
         {/* CHAT INPUT AREA */}
-        <footer className="p-3 bg-slate-900/40 border border-white/5 rounded-3xl backdrop-blur-xl mx-2">
+        <footer className="p-3 bg-slate-900/40 border border-white/5 rounded-3xl backdrop-blur-xl mx-2 flex-col flex">
           
+          {replyingTo && (
+            <div className="mb-2 bg-slate-950 p-2.5 rounded-xl flex items-center justify-between border border-white/5 w-full">
+              <div className="flex flex-col text-right w-full">
+                <span className="text-[9px] text-cyan-400 font-bold mb-0.5">الرد على {replyingTo.senderName || 'العميل'}</span>
+                <div className="text-[10px] text-gray-400 border-r-[3px] border-cyan-500 pr-2 truncate max-w-[200px]">
+                  {replyingTo.text || 'صورة'}
+                </div>
+              </div>
+              <button onClick={() => setReplyingTo(null)} className="text-gray-500 hover:text-red-400 bg-transparent border-none p-1 shrink-0">
+                <X size={14} />
+              </button>
+            </div>
+          )}
+
           {/* Selected attachment preview */}
           {selectedImage && (
             <div className="mb-2.5 flex items-center justify-between bg-slate-950 p-2 rounded-2xl border border-white/5">

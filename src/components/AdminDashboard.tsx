@@ -6,7 +6,7 @@ import {
   Copy, ArrowUpDown, Tag, PlusCircle, Power, RefreshCw, Send, Sliders, 
   Volume2, Download, Upload, Info, MessageSquare, AlertCircle, Play, Sparkles,
   ExternalLink, Layers, FileText, Share2, HelpCircle, Eye, ShieldAlert, BadgePercent, Lock,
-  Loader2, Image as ImageIcon, Gamepad, Zap, Wallet, Percent
+  Loader2, Image as ImageIcon, Gamepad, Zap, Wallet, Percent, Reply
 } from 'lucide-react';
 import { Product, User, Transaction, Order, Message } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -126,6 +126,7 @@ export default function AdminDashboard({
   
   // Support state helper
   const [chatReplyText, setChatReplyText] = useState('');
+  const [adminReplyingTo, setAdminReplyingTo] = useState<Message | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [adminName, setAdminName] = useState('أحمد محمد (المشرف)');
   const [selectedConversationUserId, setSelectedConversationUserId] = useState<string>('');
@@ -879,12 +880,15 @@ export default function AdminDashboard({
           text: chatReplyText,
           adminName,
           userId: selectedConversationUserId,
-          image: adminReplyImage || ''
+          image: adminReplyImage || '',
+          replyToId: adminReplyingTo?.id,
+          replyToText: adminReplyingTo?.text
         })
       });
       if (res.ok) {
         setChatReplyText('');
         setAdminReplyImage(null);
+        setAdminReplyingTo(null);
         showToast("تجاوب سريع! تم ترحيل ردك للعميل بالدردشة 💬");
         loadDynamicData();
       }
@@ -994,6 +998,7 @@ export default function AdminDashboard({
   // SYSTEM SETTINGS SAVER
   const [siteName, setSiteName] = useState('متجر ريكسون الرقمي R3XON');
   const [logoUrl, setLogoUrl] = useState('');
+  const [supportAvatarUrl, setSupportAvatarUrl] = useState('https://lh3.googleusercontent.com/aida-public/AB6AXuCmM4ZtcoZniNa-JQQnD_zy1K_5zAInZDJ6vj_LjGyr-BdCrpRaup5N9TPzQA9GeuajgqXcTYBcVwKQ0ZNcx4MYetSo7uhEYhz7KT6O3vFNzMn2zvoFyN_8w_TZw2GAD_b3sEFbiOH5pGOfK5cciSCy7vtAKFH63jETSus7c3Qjp2wJwZ3vCx-Hl2tDwybyxH33iB9EnRs-LVvGoJLDiJwqmt_6MsOj4HGkoFQYF4WEqXMMjOILF026U-TsnK_uWDWWVsEbZE-bxIzT');
   const [primaryColor, setPrimaryColor] = useState('#22d3ee');
   const [termsPageText, setTermsPageText] = useState('');
   const [privacyPageText, setPrivacyPageText] = useState('');
@@ -1008,6 +1013,7 @@ export default function AdminDashboard({
     if (activeTab === 'settings' && siteSettings) {
       setSiteName(siteSettings.siteName || '');
       setLogoUrl(siteSettings.logoUrl || '');
+      setSupportAvatarUrl(siteSettings.supportAvatarUrl || 'https://lh3.googleusercontent.com/aida-public/AB6AXuCmM4ZtcoZniNa-JQQnD_zy1K_5zAInZDJ6vj_LjGyr-BdCrpRaup5N9TPzQA9GeuajgqXcTYBcVwKQ0ZNcx4MYetSo7uhEYhz7KT6O3vFNzMn2zvoFyN_8w_TZw2GAD_b3sEFbiOH5pGOfK5cciSCy7vtAKFH63jETSus7c3Qjp2wJwZ3vCx-Hl2tDwybyxH33iB9EnRs-LVvGoJLDiJwqmt_6MsOj4HGkoFQYF4WEqXMMjOILF026U-TsnK_uWDWWVsEbZE-bxIzT');
       setPrimaryColor(siteSettings.primaryColor || '#22d3ee');
       setTermsPageText(siteSettings.termsPage || '');
       setPrivacyPageText(siteSettings.privacyPage || '');
@@ -1025,6 +1031,7 @@ export default function AdminDashboard({
     const body = {
       siteName,
       logoUrl,
+      supportAvatarUrl,
       faviconUrl: '',
       primaryColor,
       termsPage: termsPageText,
@@ -2790,6 +2797,12 @@ export default function AdminDashboard({
                                 <span>{msg.senderName}</span>
                               </div>
                               
+                              {msg.replyToText && (
+                                <div className="mb-2 bg-slate-950/40 border-r-2 border-white/30 pr-2 py-1 rounded text-[9px] text-white/70 w-full line-clamp-1 italic text-right leading-relaxed block max-w-full">
+                                  {msg.replyToText}
+                                </div>
+                              )}
+                              
                               {msg.image && (
                                 <div className="rounded-xl overflow-hidden border border-white/10 max-w-[180px] cursor-pointer group hover:brightness-110 relative">
                                   <img 
@@ -2805,6 +2818,12 @@ export default function AdminDashboard({
                                 <p className="leading-relaxed whitespace-pre-wrap">{msg.text}</p>
                               )}
                             </div>
+                            
+                            {!isAgent && (
+                              <button onClick={() => setAdminReplyingTo(msg)} className="text-gray-500 hover:text-white transition-colors focus:outline-none shrink-0 group items-center flex mt-2 h-max">
+                                 <Reply size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </button>
+                            )}
                           </div>
                         );
                       })
@@ -2812,6 +2831,21 @@ export default function AdminDashboard({
                   </div>
 
                   {/* Attachment indicator wrapper if active */}
+                  <div className="w-full flex-col">
+                    {adminReplyingTo && (
+                      <div className="mb-2 bg-slate-950 p-2.5 rounded-xl flex items-center justify-between border border-white/5 w-full">
+                        <div className="flex flex-col text-right w-full">
+                          <span className="text-[9px] text-cyan-400 font-bold mb-0.5">الرد على {adminReplyingTo.senderName || 'العميل'}</span>
+                          <div className="text-[10px] text-gray-400 border-r-[3px] border-cyan-500 pr-2 truncate max-w-[200px]">
+                            {adminReplyingTo.text || 'صورة'}
+                          </div>
+                        </div>
+                        <button onClick={() => setAdminReplyingTo(null)} className="text-gray-500 hover:text-red-400 bg-transparent border-none p-1 shrink-0">
+                          <X size={14} />
+                        </button>
+                      </div>
+                    )}
+                    
                   {adminReplyImage && (
                     <div className="mb-2 bg-slate-950 p-2 rounded-xl flex items-center justify-between border border-white/5">
                       <div className="flex items-center gap-2">
@@ -2833,6 +2867,7 @@ export default function AdminDashboard({
                       </button>
                     </div>
                   )}
+                  </div>
 
                   {/* Inputs message bar section */}
                   <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-2xl border border-white/5">
@@ -3065,6 +3100,22 @@ export default function AdminDashboard({
                   onChange={(e) => setLogoUrl(e.target.value)}
                   className="bg-slate-950 border border-white/10 rounded-xl text-xs py-2.5 px-3 text-left font-mono text-white outline-none w-full"
                 />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-gray-400 font-bold block">صورة المشرف أو صاحب الدعم الفني (Support/Owner Avatar)</label>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10shrink-0 overflow-hidden rounded-full ring-2 ring-white/10 shrink-0">
+                     <img src={supportAvatarUrl} alt="Avatar Preview" className="w-full h-full object-cover" />
+                  </div>
+                  <input
+                    type="text"
+                    value={supportAvatarUrl}
+                    onChange={(e) => setSupportAvatarUrl(e.target.value)}
+                    className="bg-slate-950 border border-white/10 rounded-xl text-xs py-2.5 px-3 text-left font-mono text-white outline-none w-full"
+                    placeholder="ضع رابط الصورة هنا"
+                  />
+                </div>
               </div>
 
               <div className="space-y-1.5">

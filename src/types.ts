@@ -66,6 +66,8 @@ export interface Message {
   userId?: string;
   image?: string;
   isRead?: number;
+  replyToId?: string;
+  replyToText?: string;
 }
 
 export interface Transaction {
