@@ -67,12 +67,33 @@ export default function Storefront({
 
   // Filter products by category and search query
   const filteredProducts = products.filter(p => {
+    // Hide sub-products from the main storefront
+    if (p.parentId && p.parentId.trim() !== '') return false;
+
     const matchesCategory = selectedCategory === 'all' ? true : p.category === selectedCategory;
     const nameLower = (p.name || '').toLowerCase();
     const queryLower = (searchQuery || '').toLowerCase();
     const matchesSearch = nameLower.includes(queryLower) || 
                           (Array.isArray(p.features) && p.features.some(f => f && typeof f === 'string' && f.toLowerCase().includes(queryLower)));
     return matchesCategory && matchesSearch;
+  });
+
+  // Sort products so that items with standard timestamps (newly added) appear at the absolute top
+  const sortedProducts = [...filteredProducts].sort((a, b) => {
+    const aTime = a.id.startsWith('prod-') ? Number(a.id.substring(5)) : 0;
+    const bTime = b.id.startsWith('prod-') ? Number(b.id.substring(5)) : 0;
+
+    const aIsTimestamp = !isNaN(aTime) && aTime > 1700000000000;
+    const bIsTimestamp = !isNaN(bTime) && bTime > 1700000000000;
+
+    if (aIsTimestamp && bIsTimestamp) {
+      return bTime - aTime; // Newest first
+    }
+    if (aIsTimestamp) return -1; // Newly added comes before static/older products
+    if (bIsTimestamp) return 1;
+
+    // Fallback original order
+    return 0;
   });
 
   const getCategoryNameAr = (cat: string) => {
@@ -128,7 +149,7 @@ export default function Storefront({
               className="flex items-center gap-1 bg-amber-400/10 border border-amber-400/30 hover:border-amber-400 px-2 py-0.5 rounded-full cursor-pointer transition-all active:scale-95 shadow-[0_0_8px_rgba(251,191,36,0.2)] font-sans select-none"
             >
               <span className="text-[10px] font-black text-amber-300 font-mono tracking-wide">
-                {(Number(userBalance) || 0).toLocaleString('ar-EG')} د.ع
+                {(Number(userBalance) || 0).toLocaleString('en-US')} $
               </span>
               <div className="w-3.5 h-3.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] flex items-center justify-center pb-[1px] shadow-sm pointer-events-none shrink-0 leading-none">
                 +
@@ -208,7 +229,7 @@ export default function Storefront({
                   </div>
                   <h2 className="text-sm font-black text-white">{slide.title}</h2>
                   {product && product.price !== undefined && product.price !== null ? (
-                    <p className="text-[10px] text-cyan-400 font-bold">{(Number(product.price) || 0).toLocaleString('ar-EG')} د.ع / {product.period}</p>
+                    <p className="text-[10px] text-cyan-400 font-bold">{(Number(product.price) || 0).toLocaleString('en-US')} $ / {product.period}</p>
                   ) : (
                     <p className="text-[10px] text-gray-400">تابع التفاصيل والشراء الفوري فوراً</p>
                   )}
@@ -278,7 +299,7 @@ export default function Storefront({
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
-            {filteredProducts.map((p) => {
+            {sortedProducts.map((p) => {
               // Dynamically pick render icon
               let IconComp = Sparkles;
               if (p.iconName === 'brain') IconComp = Brain;
@@ -288,18 +309,29 @@ export default function Storefront({
               else if (p.iconName === 'smartphone') IconComp = Smartphone;
               else if (p.iconName === 'shield') IconComp = Shield;
 
+              const pTimestamp = p.id.startsWith('prod-') ? Number(p.id.substring(5)) : 0;
+              const isNew = !isNaN(pTimestamp) && pTimestamp > 1700000000000;
+
               return (
                 <motion.div
                   key={p.id}
                   layoutId={`product-${p.id}`}
                   className="glass-card rounded-2xl p-3 flex flex-col justify-between relative overflow-hidden group border border-white/5 hover:border-white/10"
                 >
-                  {/* Small discount tag */}
-                  {p.originalPrice && (
-                    <div className="absolute top-1 left-1 bg-red-500/80 backdrop-blur-xs text-[7px] text-white px-1.5 py-0.5 rounded-md font-bold">
-                      {Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100)}% خصم
-                    </div>
-                  )}
+                  {/* Tags Stack Container */}
+                  <div className="absolute top-1.5 left-1.5 flex flex-col gap-1 z-30 items-start">
+                    {isNew && (
+                      <div className="bg-gradient-to-l from-emerald-500 to-teal-400 text-[7px] text-white px-1.5 py-0.5 rounded font-black tracking-wide flex items-center gap-0.5 shadow-md">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                        <span>جديد</span>
+                      </div>
+                    )}
+                    {p.originalPrice && (
+                      <div className="bg-red-500/85 backdrop-blur-xs text-[7px] text-white px-1.5 py-0.5 rounded font-bold">
+                        {Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100)}% خصم
+                      </div>
+                    )}
+                  </div>
 
                   {/* Stock tag */}
                   <div className="absolute top-1 right-1 text-[8.5px] px-1 text-slate-400 font-medium">
@@ -362,7 +394,7 @@ export default function Storefront({
                         ⭐ {p.rating}
                       </span>
                       <p className="text-xs font-bold text-cyan-400">
-                        {(Number(p.price) || 0).toLocaleString('ar-EG')} <span className="text-[8px] text-gray-400 font-normal">د.ع</span>
+                        {(Number(p.price) || 0).toLocaleString('en-US')} <span className="text-[8px] text-gray-400 font-normal">$</span>
                       </p>
                     </div>
                   </div>

@@ -226,6 +226,7 @@ export default function AdminDashboard({
   const [prodProductType, setProdProductType] = useState('standard');
   const [prodKeys, setProdKeys] = useState('');
   const [prodRequirePlayerId, setProdRequirePlayerId] = useState(false);
+  const [prodParentId, setProdParentId] = useState('');
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
 
   // Custom step-by-step product wizard states
@@ -507,6 +508,7 @@ export default function AdminDashboard({
       setProdProductType((p as any).productType || 'standard');
       setProdKeys(Array.isArray((p as any).keys) ? (p as any).keys.join('\n') : '');
       setProdRequirePlayerId(!!(p as any).requirePlayerId);
+      setProdParentId(p.parentId || '');
 
       if (p.productType === 'account') {
         const details = p.accountDetails || {};
@@ -566,6 +568,7 @@ export default function AdminDashboard({
       setProdProductType('standard');
       setProdKeys('');
       setProdRequirePlayerId(false);
+      setProdParentId('');
 
       setProdTypeStep1('others');
       setProdStep2Subtype('pubg');
@@ -606,6 +609,7 @@ export default function AdminDashboard({
     setProdProductType((p as any).productType || 'standard');
     setProdKeys((p as any).keys ? (p as any).keys.join('\n') : '');
     setProdRequirePlayerId(Boolean((p as any).requirePlayerId));
+    setProdParentId(p.parentId || '');
     setActiveModal('product');
     showToast("تم نسخ المنتج بسرعة! عدل حفظ البيانات للحفظ 📄");
   };
@@ -675,13 +679,14 @@ export default function AdminDashboard({
       keys: keysList,
       requirePlayerId: prodRequirePlayerId ? 1 : 0,
       isSold: isAccount ? (editingProduct?.isSold ? 1 : 0) : 0,
-      accountDetails: isAccount ? accountDetailsObj : {}
+      accountDetails: isAccount ? accountDetailsObj : {},
+      parentId: prodParentId
     };
 
     if (editingProduct) {
       await onEditProduct(body as any);
       showToast("تم تعديل بيانات المنتج وحفظها بنجاح 💎");
-      await writeLog("تعديل منتج", `تم حفظ التعديلات على المنتج: ${prodName} بـ سعر ${prodPrice} د.ع`);
+      await writeLog("تعديل منتج", `تم حفظ التعديلات على المنتج: ${prodName} بـ سعر ${prodPrice} $`);
     } else {
       await onAddProduct(body);
       showToast("تم إنشاء المنتج الرقمي وإضافته للمتجر بنجاح 🛒");
@@ -778,7 +783,7 @@ export default function AdminDashboard({
         showToast(editingCoupon ? "تم تحديث كوبون الخصم 🔖" : "تم إنشاء الكوبون الجديد بنجاح 🎊");
         await writeLog(
           editingCoupon ? "تعديل كوبون" : "صناعة كوبون",
-          `اسم الكوبون (${coupCode}) بقيمة ${coupValue}${coupType === 'percent' ? '%' : 'د.ع'}`
+          `اسم الكوبون (${coupCode}) بقيمة ${coupValue}${coupType === 'percent' ? '%' : '$'}`
         );
         setActiveModal(null);
       } else {
@@ -1081,7 +1086,7 @@ export default function AdminDashboard({
       });
       if (res.ok) {
         showToast("تم تعديل بيانات ورصيد العميل بنجاح 👥");
-        await writeLog("تعديل بيانات عميل", `رصيد (${userNameState}) أصبح ${userBalanceState} د.ع وحالته (${userStatusState})`);
+        await writeLog("تعديل بيانات عميل", `رصيد (${userNameState}) أصبح ${userBalanceState} $ وحالته (${userStatusState})`);
         setActiveModal(null);
         if (onRefreshUsers) await onRefreshUsers();
         loadDynamicData();
@@ -1119,12 +1124,12 @@ export default function AdminDashboard({
       });
       if (res.ok) {
         showToast(type === 'add' 
-          ? `تمت إضافة ${amount} د.ع لرصيد العميل ${userName} بنجاح! 💰` 
-          : `تم خصم ${amount} د.ع من رصيد العميل ${userName} بنجاح! 💸`
+          ? `تمت إضافة ${amount} $ لرصيد العميل ${userName} بنجاح! 💰` 
+          : `تم خصم ${amount} $ من رصيد العميل ${userName} بنجاح! 💸`
         );
         await writeLog(
           type === 'add' ? "شحن رصيد سريع" : "خصم رصيد سريع", 
-          `العميل: ${userName} (ID: ${userId})، المبلغ: ${amount} د.ع`
+          `العميل: ${userName} (ID: ${userId})، المبلغ: ${amount} $`
         );
         if (onRefreshUsers) await onRefreshUsers();
         await loadDynamicData();
@@ -1237,7 +1242,7 @@ export default function AdminDashboard({
     
     fullOrders.forEach(o => {
       const credsText = o.credentials?.code ? `كود: ${o.credentials.code}` : `حساب: ${o.credentials?.username || ''} | سر: ${o.credentials?.password || ''}`;
-      csvContent += `${o.id},${o.productName},${o.price} د.ع,${o.date},${o.status},"${credsText}"\n`;
+      csvContent += `${o.id},${o.productName},${o.price} $,${o.date},${o.status},"${credsText}"\n`;
     });
 
     const encodedUri = encodeURI(csvContent);
@@ -1446,19 +1451,19 @@ export default function AdminDashboard({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="bg-[#1e1b4b]/60 border border-indigo-500/10 p-4 rounded-3xl text-right">
                 <span className="text-[10px] text-indigo-300 font-bold block mb-1">المبيعات الكلية</span>
-                <p className="text-[17px] font-black tracking-tight text-white">{grossIncome.toLocaleString('ar-EG')} د.ع</p>
+                <p className="text-[17px] font-black tracking-tight text-white">{grossIncome.toLocaleString('en-US')} $</p>
                 <span className="text-[8px] text-gray-300 mt-1 block">توزيع عوائد وتسويات</span>
               </div>
 
               <div className="bg-[#1c1d1a]/80 border border-green-500/10 p-4 rounded-3xl text-right">
                 <span className="text-[10px] text-emerald-400 font-bold block mb-1">صافي أرباح ريكسون</span>
-                <p className="text-[17px] font-black tracking-tight text-emerald-400">{netCommission.toLocaleString('ar-EG')} د.ع</p>
+                <p className="text-[17px] font-black tracking-tight text-emerald-400">{netCommission.toLocaleString('en-US')} $</p>
                 <div className="text-[8px] text-gray-400 mt-1">العمولة المهيأة (%15 كمتوسط)</div>
               </div>
 
               <div className="bg-[#1f2025]/80 border border-amber-500/10 p-4 rounded-3xl text-right">
                 <span className="text-[10px] text-amber-300 font-bold block mb-1">مستحقات الشركاء</span>
-                <p className="text-[17px] font-black tracking-tight text-amber-400">{partnerShares.toLocaleString('ar-EG')} د.ع</p>
+                <p className="text-[17px] font-black tracking-tight text-amber-400">{partnerShares.toLocaleString('en-US')} $</p>
                 <span className="text-[8px] text-gray-400 mt-1 block">قابلة للسحب للبنوك</span>
               </div>
 
@@ -1478,19 +1483,19 @@ export default function AdminDashboard({
               
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between items-center py-1">
-                  <span className="font-mono font-bold text-cyan-400">{Number(dailyRev).toLocaleString('ar-EG')} د.ع</span>
+                  <span className="font-mono font-bold text-cyan-400">{Number(dailyRev).toLocaleString('en-US')} $</span>
                   <span className="text-gray-400">الأرباح التقديرية اليومية</span>
                 </div>
                 <div className="w-full bg-white/5 h-1 rounded-full"><div className="bg-cyan-400 h-1 rounded-full" style={{ width: '40%' }}></div></div>
 
                 <div className="flex justify-between items-center py-1">
-                  <span className="font-mono font-bold text-amber-400">{Number(weeklyRev).toLocaleString('ar-EG')} د.ع</span>
+                  <span className="font-mono font-bold text-amber-400">{Number(weeklyRev).toLocaleString('en-US')} $</span>
                   <span className="text-gray-400">الأرباح التقديرية الأسبوعية</span>
                 </div>
                 <div className="w-full bg-white/5 h-1 rounded-full"><div className="bg-amber-400 h-1 rounded-full" style={{ width: '70%' }}></div></div>
 
                 <div className="flex justify-between items-center py-1">
-                  <span className="font-mono font-bold text-emerald-400">{Number(monthlyRev).toLocaleString('ar-EG')} د.ع</span>
+                  <span className="font-mono font-bold text-emerald-400">{Number(monthlyRev).toLocaleString('en-US')} $</span>
                   <span className="text-gray-400">الأرباح التقديرية الشهرية</span>
                 </div>
                 <div className="w-full bg-white/5 h-1 rounded-full"><div className="bg-emerald-400 h-1 rounded-full" style={{ width: '100%' }}></div></div>
@@ -1600,7 +1605,7 @@ export default function AdminDashboard({
                                 <span>{p.name}</span>
                               </div>
                             </td>
-                            <td className="py-3 text-center font-mono font-bold text-cyan-400">{(p.price ?? 0).toLocaleString('ar-EG')} د.ع</td>
+                            <td className="py-3 text-center font-mono font-bold text-cyan-400">{(p.price ?? 0).toLocaleString('en-US')} $</td>
                             <td className="py-3 text-center font-mono font-extrabold text-white">{stockCount} كود</td>
                             <td className="py-3 text-center font-mono text-gray-400">{soldCount} كود مباع</td>
                             <td className="py-3 text-left">{statusBadge}</td>
@@ -1641,7 +1646,7 @@ export default function AdminDashboard({
                     {products
                       .filter(p => p.productType === 'auto_keys' && p.category === 'games')
                       .map(p => (
-                        <option key={p.id} value={p.id}>{p.name} ({(p.price ?? 0).toLocaleString('ar-EG')} د.ع)</option>
+                        <option key={p.id} value={p.id}>{p.name} ({(p.price ?? 0).toLocaleString('en-US')} $)</option>
                       ))}
                   </select>
                 </div>
@@ -1872,7 +1877,7 @@ export default function AdminDashboard({
                           </div>
                           
                           <h4 className="text-xs font-black text-white leading-snug line-clamp-2 mt-1">{p.name}</h4>
-                          <p className="text-base font-black text-cyan-400 mt-1">{(p.price ?? 0).toLocaleString('ar-EG')} د.ع</p>
+                          <p className="text-base font-black text-cyan-400 mt-1">{(p.price ?? 0).toLocaleString('en-US')} $</p>
                         </div>
 
                         {p.imageUrl ? (
@@ -2015,20 +2020,20 @@ export default function AdminDashboard({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 text-right">
                 <div className="bg-[#0f172a]/80 border border-indigo-500/10 p-4 rounded-3xl relative overflow-hidden">
                   <span className="text-[10px] text-indigo-400 block mb-1 font-bold">المبيعات اليومية (اليوم)</span>
-                  <p className="text-lg font-black text-white font-mono">{actualDailyRevenue.toLocaleString('ar-EG')} د.ع</p>
-                  <p className="text-[9.5px] text-emerald-400 mt-1 font-sans">✓ صافي العمولة: {dailyProfit.toLocaleString('ar-EG')} د.ع</p>
+                  <p className="text-lg font-black text-white font-mono">{actualDailyRevenue.toLocaleString('en-US')} $</p>
+                  <p className="text-[9.5px] text-emerald-400 mt-1 font-sans">✓ صافي العمولة: {dailyProfit.toLocaleString('en-US')} $</p>
                 </div>
 
                 <div className="bg-[#0c2e1b]/40 border border-emerald-500/10 p-4 rounded-3xl relative overflow-hidden">
                   <span className="text-[10px] text-emerald-400 block mb-1 font-bold">المبيعات الشهرية (الشهر الحالي)</span>
-                  <p className="text-lg font-black text-emerald-400 font-mono">{actualMonthlyRevenue.toLocaleString('ar-EG')} د.ع</p>
-                  <p className="text-[9.5px] text-gray-300 mt-1 font-sans">✓ صافي العمولة: {monthlyProfit.toLocaleString('ar-EG')} د.ع</p>
+                  <p className="text-lg font-black text-emerald-400 font-mono">{actualMonthlyRevenue.toLocaleString('en-US')} $</p>
+                  <p className="text-[9.5px] text-gray-300 mt-1 font-sans">✓ صافي العمولة: {monthlyProfit.toLocaleString('en-US')} $</p>
                 </div>
 
                 <div className="bg-[#1e1b4b]/80 border border-amber-500/10 p-4 rounded-3xl relative overflow-hidden">
                   <span className="text-[10px] text-amber-300 block mb-1 font-bold">المبيعات السنوية (العام الحالي)</span>
-                  <p className="text-lg font-black text-amber-400 font-mono">{actualYearlyRevenue.toLocaleString('ar-EG')} د.ع</p>
-                  <p className="text-[9.5px] text-gray-300 mt-1 font-sans">✓ صافي العمولة: {yearlyProfit.toLocaleString('ar-EG')} د.ع</p>
+                  <p className="text-lg font-black text-amber-400 font-mono">{actualYearlyRevenue.toLocaleString('en-US')} $</p>
+                  <p className="text-[9.5px] text-gray-300 mt-1 font-sans">✓ صافي العمولة: {yearlyProfit.toLocaleString('en-US')} $</p>
                 </div>
               </div>
 
@@ -2036,7 +2041,7 @@ export default function AdminDashboard({
               <div className="grid grid-cols-2 gap-3.5 text-right">
                 <div className="bg-slate-900/50 border border-white/5 p-4 rounded-2.5xl">
                   <span className="text-[9px] text-gray-400 block mb-0.5 font-bold">متوسط حجم سلة الشراء (سلة العميل)</span>
-                  <p className="text-base font-extrabold text-white font-mono">{avgOrderBasketValue.toLocaleString('ar-EG')} د.ع</p>
+                  <p className="text-base font-extrabold text-white font-mono">{avgOrderBasketValue.toLocaleString('en-US')} $</p>
                 </div>
                 <div className="bg-slate-900/50 border border-white/5 p-4 rounded-2.5xl">
                   <span className="text-[9px] text-gray-400 block mb-0.5 font-bold">إجمالي الطلبات المكتملة</span>
@@ -2073,9 +2078,9 @@ export default function AdminDashboard({
                                 <span>{t.details || 'حركة مالية لعميل'}</span>
                               </div>
                             </td>
-                            <td className="py-3 text-center text-gray-400 font-sans">{t.timestamp ? new Date(t.timestamp).toLocaleDateString('ar-EG', {hour:'2-digit',minute:'2-digit'}) : 'منذ قليل'}</td>
+                            <td className="py-3 text-center text-gray-400 font-sans">{t.timestamp ? new Date(t.timestamp).toLocaleDateString('en-US', {hour:'2-digit',minute:'2-digit'}) : 'منذ قليل'}</td>
                             <td className="py-3 text-center font-mono font-black" style={{ color: isDeposit ? '#34d399' : '#f87171' }}>
-                              {isDeposit ? '+' : '-'}{(t.amount || 0).toLocaleString('ar-EG')} د.ع
+                              {isDeposit ? '+' : '-'}{(t.amount || 0).toLocaleString('en-US')} $
                             </td>
                             <td className="py-3 text-left">
                               <span className="text-gray-400">{t.paymentMethod === 'asiacell' ? 'شحن فوري آسياسيل ' : 'محفظة الزبون الذاتية'}</span>
@@ -2264,8 +2269,8 @@ export default function AdminDashboard({
                     {/* Stock Quick updates and Prices row */}
                     <div className="grid grid-cols-2 bg-slate-950/40 p-2.5 rounded-xl text-[11px] items-center">
                       <div className="text-left font-mono">
-                        <span className="text-white text-xs font-bold">{(p.price ?? 0).toLocaleString('ar-EG')} د.ع</span>
-                        {p.originalPrice && <span className="text-gray-500 line-through mr-1 text-[9px]">{p.originalPrice.toLocaleString('ar-EG')} د.ع</span>}
+                        <span className="text-white text-xs font-bold">{(p.price ?? 0).toLocaleString('en-US')} $</span>
+                        {p.originalPrice && <span className="text-gray-500 line-through mr-1 text-[9px]">{p.originalPrice.toLocaleString('en-US')} $</span>}
                       </div>
 
                       <div className="flex items-center gap-1.5 justify-end">
@@ -2350,7 +2355,7 @@ export default function AdminDashboard({
                     </div>
 
                     <p className="text-[11px] text-gray-300 mt-2">
-                      قيمة الخصم: <span className="text-cyan-400 font-bold">{c.value}{c.type === 'percent' ? '%' : 'د.ع'}</span>
+                      قيمة الخصم: <span className="text-cyan-400 font-bold">{c.value}{c.type === 'percent' ? '%' : '$'}</span>
                     </p>
                     <p className="text-[9px] text-gray-400 mt-1">
                       الاستخدام: {c.usedCount} من أصل {c.maxUses} استخدام • تاريخ الانتهاء: {c.expiryDate || 'مفتوح'}
@@ -2426,12 +2431,12 @@ export default function AdminDashboard({
                     {/* Delivery content status verification */}
                     <div className="bg-slate-950/40 p-3 rounded-2xl text-right text-[11px] space-y-2">
                       <div className="flex justify-between">
-                        <span className="font-mono text-white font-bold">{Number(ord.price).toLocaleString('ar-EG')} د.ع</span>
+                        <span className="font-mono text-white font-bold">{Number(ord.price).toLocaleString('en-US')} $</span>
                         <span className="text-gray-400">القيمة الإجمالية</span>
                       </div>
 
                       <div className="flex justify-between">
-                        <span className="font-mono text-amber-400">{Number(companyProfit).toLocaleString('ar-EG')} د.ع (%{ord.commission_rate})</span>
+                        <span className="font-mono text-amber-400">{Number(companyProfit).toLocaleString('en-US')} $ (%{ord.commission_rate})</span>
                         <span className="text-gray-400">صافي العمولة</span>
                       </div>
 
@@ -2543,7 +2548,7 @@ export default function AdminDashboard({
 
                   {/* Balance Display */}
                   <div className="flex items-center justify-between text-[11px] bg-slate-950/40 px-3 py-2.5 rounded-xl border border-white/5 font-sans">
-                    <span className="font-mono text-cyan-400 font-extrabold text-xs">{Number(u.balance).toLocaleString('ar-EG')} د.ع</span>
+                    <span className="font-mono text-cyan-400 font-extrabold text-xs">{Number(u.balance).toLocaleString('en-US')} $</span>
                     <span className="text-gray-400 font-medium">الرصيد المشحون بالمحفظة</span>
                   </div>
 
@@ -3146,7 +3151,7 @@ export default function AdminDashboard({
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] text-gray-400 font-bold block">معدل تحويل دينار عراقي للشحن الفوري</label>
+                    <label className="text-[10px] text-gray-400 font-bold block">معدل تحويل دولار للشحن الفوري</label>
                     <input
                       type="number"
                       value={asiacellRate}
@@ -3154,7 +3159,7 @@ export default function AdminDashboard({
                       placeholder="350"
                       className="bg-slate-950 border border-white/10 rounded-xl text-xs py-2.5 px-3 text-left font-mono text-white outline-none w-full"
                     />
-                    <p className="text-[9px] text-gray-500">القيمة الافتراضية هي 1 (لأن العملة الأساسية للمتجر بالكامل أصبحت بالدينار العراقي د.ع).</p>
+                    <p className="text-[9px] text-gray-500">القيمة الافتراضية هي 1 (لأن العملة الأساسية للمتجر بالكامل أصبحت بالدولار الأمريكي $).</p>
                   </div>
                 </div>
               </div>
@@ -3738,7 +3743,7 @@ export default function AdminDashboard({
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="text-[10px] text-gray-400">سعر البيع (د.ع)</label>
+                        <label className="text-[10px] text-gray-400">سعر البيع ($)</label>
                         <input
                           type="text"
                           value={prodPrice}
@@ -3748,7 +3753,7 @@ export default function AdminDashboard({
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] text-gray-400 text-right">السعر قبل الخصم (د.ع)</label>
+                        <label className="text-[10px] text-gray-400 text-right">السعر قبل الخصم ($)</label>
                         <input
                           type="text"
                           value={prodOriginalPrice}
@@ -3775,6 +3780,25 @@ export default function AdminDashboard({
                           {!categories.some(c => c.id === 'games') && <option value="games">خدمات الألعاب</option>}
                         </select>
                       </div>
+                      <div>
+                        <label className="text-[10px] text-gray-400">المنتج الأب (لعرض متداخل فرعي)</label>
+                        <select
+                          value={prodParentId}
+                          onChange={(e) => setProdParentId(e.target.value)}
+                          className="bg-slate-950 border border-white/10 rounded-xl py-1.5 px-2 text-right w-full mt-1 text-white outline-none"
+                        >
+                          <option value="">-- منتج مستقل رئيسي (بدون أب) --</option>
+                          {products
+                            .filter(prod => (!prod.parentId || prod.parentId === "") && prod.id !== prodId)
+                            .map((p) => (
+                              <option key={p.id} value={p.id}>{p.name}</option>
+                            ))
+                          }
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="text-[10px] text-gray-400">مدة/نوع الاشتراك</label>
                         <input
@@ -3993,7 +4017,7 @@ export default function AdminDashboard({
                       className="bg-slate-950 border border-white/10 rounded-xl py-2 px-3 w-full text-white text-right"
                     >
                       <option value="percent">نسبة مئوية (%)</option>
-                      <option value="flat">مبلغ مالي ثابت (د.ع)</option>
+                      <option value="flat">مبلغ مالي ثابت ($)</option>
                     </select>
                   </div>
                   <div>
@@ -4280,7 +4304,7 @@ export default function AdminDashboard({
                     </select>
                   </div>
                   <div>
-                    <label className="text-[10px] text-gray-400">شحن الرصيد بموجب (د.ع)</label>
+                    <label className="text-[10px] text-gray-400">شحن الرصيد بموجب ($)</label>
                     <input
                       type="number"
                       value={userBalanceState}

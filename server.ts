@@ -71,7 +71,8 @@ async function initDatabase() {
         imageUrl TEXT,
         commission_rate REAL DEFAULT 15,
         store_share REAL,
-        vendor_share REAL
+        vendor_share REAL,
+        userId TEXT
       )
     `);
 
@@ -205,6 +206,9 @@ async function initDatabase() {
     try {
       await db.execute("ALTER TABLE rx_products ADD COLUMN accountDetails TEXT DEFAULT '{}'");
     } catch (e) {}
+    try {
+      await db.execute("ALTER TABLE rx_products ADD COLUMN parentId TEXT");
+    } catch (e) {}
 
 
     // Safe Schema Alterations to users table
@@ -212,6 +216,11 @@ async function initDatabase() {
       await db.execute("ALTER TABLE rx_users ADD COLUMN password TEXT");
     } catch (e) {
       console.log('Error adding password column:', e);
+    }
+    try {
+      await db.execute("ALTER TABLE rx_users ADD COLUMN shippingCode TEXT");
+    } catch (e) {
+      console.log('Error adding shippingCode column:', e);
     }
 
     // Set any old default/mock test balances (like 450.0, 350.0, 650.0) to 0.0
@@ -227,6 +236,12 @@ async function initDatabase() {
       await db.execute("ALTER TABLE rx_messages ADD COLUMN userId TEXT");
     } catch (e) {
       console.log('Error adding userId column:', e);
+    }
+    // Safe Schema Alterations to rx_orders table for user tracking
+    try {
+      await db.execute("ALTER TABLE rx_orders ADD COLUMN userId TEXT");
+    } catch (e) {
+      console.log('Error adding userId column to rx_orders:', e);
     }
     try {
       await db.execute("ALTER TABLE rx_messages ADD COLUMN image TEXT");
@@ -318,7 +333,7 @@ async function initDatabase() {
     if (Number(logsCheck.rows[0].count) === 0) {
       await db.execute({
         sql: "INSERT INTO rx_logs (id, adminName, actionType, details, timestamp) VALUES (?, ?, ?, ?, ?)",
-        args: [`log-${Date.now()}`, 'النظام الأساسي', 'تهيئة لوحة التحكم', 'تم تأسيس لوحة الإدارة الذكية وتمرير السجلات والمخازن التفاعلية لمتجر ريكسون الرقمي.', new Date().toLocaleString('ar-SA')]
+        args: [`log-${Date.now()}`, 'النظام الأساسي', 'تهيئة لوحة التحكم', 'تم تأسيس لوحة الإدارة الذكية وتمرير السجلات والمخازن التفاعلية لمتجر ريكسون الرقمي.', new Date().toLocaleString('en-US')]
       });
     }
 
@@ -452,6 +467,161 @@ async function initDatabase() {
       }
     }
 
+    // Ensure all extra PUBG Mobile UC tiers exist in the database for a rich selection
+    const extraPubgProducts = [
+      {
+        id: 'prod-pubg-60',
+        name: 'شحن شدات ببجي 60UC',
+        category: 'games',
+        price: 4.50,
+        originalPrice: 6.00,
+        period: '60 شدة فورية',
+        stock: 50,
+        imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDDOSlnh8_DPFEpa-9U-o7j8A3KJE0PX-N1_Cv5_qO-VWn-gGvaByaflsoqHrh0m7YqJJP8_savJuHifuxTTHztb8xSFmC_Lfm1WOt0vIRXy6FoPHjjYb_kl534Im_VX-0-m3MLNIdnxu2oGeO9Yf9xA3u-DyU4y3hcDjzRMyyWcm8alN9ssrQ1VafKDmckIxzl29R8IGAhf-IFwiK_xY_cLWR3cGA1kCHnKmjVB47Zq-FqFV4-kvON1h1RtP6RX08K0FEKDzMg6mkb',
+        iconName: 'gamepad-2',
+        rating: 4.8,
+        reviewsCount: 310,
+        features: JSON.stringify([
+          'شحن رسمي وفوري مباشر عبر الايدي (ID)',
+          'توفير الكود وتفعيله فورياً عبر Midasbuy',
+          'ضمان رسمي موثوق مائة بالمائة'
+        ]),
+        gradientClass: null,
+        commission_rate: 8,
+        productType: 'auto_keys',
+        keys: JSON.stringify(["PUBG-ABC-UC60", "PUBG-XYZ-UC60", "PUBG-QWE-UC60"])
+      },
+      {
+        id: 'prod-pubg-325',
+        name: 'شحن شدات ببجي 325UC',
+        category: 'games',
+        price: 22.50,
+        originalPrice: 28.00,
+        period: '325 شدة فورية',
+        stock: 40,
+        imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDDOSlnh8_DPFEpa-9U-o7j8A3KJE0PX-N1_Cv5_qO-VWn-gGvaByaflsoqHrh0m7YqJJP8_savJuHifuxTTHztb8xSFmC_Lfm1WOt0vIRXy6FoPHjjYb_kl534Im_VX-0-m3MLNIdnxu2oGeO9Yf9xA3u-DyU4y3hcDjzRMyyWcm8alN9ssrQ1VafKDmckIxzl29R8IGAhf-IFwiK_xY_cLWR3cGA1kCHnKmjVB47Zq-FqFV4-kvON1h1RtP6RX08K0FEKDzMg6mkb',
+        iconName: 'gamepad-2',
+        rating: 4.9,
+        reviewsCount: 420,
+        features: JSON.stringify([
+          'شحن رسمي وفوري مباشر عبر الايدي (ID)',
+          'توفير الكود وتفعيله فورياً عبر Midasbuy',
+          'ضمان رسمي موثوق مائة بالمائة'
+        ]),
+        gradientClass: null,
+        commission_rate: 8,
+        productType: 'auto_keys',
+        keys: JSON.stringify(["PUBG-ABC-UC325", "PUBG-XYZ-UC325", "PUBG-QWE-UC325"])
+      },
+      {
+        id: 'prod-pubg-1320',
+        name: 'شحن شدات ببجي 1320UC',
+        category: 'games',
+        price: 85.00,
+        originalPrice: 110.00,
+        period: '1320 شدة فورية',
+        stock: 25,
+        imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDDOSlnh8_DPFEpa-9U-o7j8A3KJE0PX-N1_Cv5_qO-VWn-gGvaByaflsoqHrh0m7YqJJP8_savJuHifuxTTHztb8xSFmC_Lfm1WOt0vIRXy6FoPHjjYb_kl534Im_VX-0-m3MLNIdnxu2oGeO9Yf9xA3u-DyU4y3hcDjzRMyyWcm8alN9ssrQ1VafKDmckIxzl29R8IGAhf-IFwiK_xY_cLWR3cGA1kCHnKmjVB47Zq-FqFV4-kvON1h1RtP6RX08K0FEKDzMg6mkb',
+        iconName: 'gamepad-2',
+        rating: 4.9,
+        reviewsCount: 520,
+        features: JSON.stringify([
+          'شحن رسمي وفوري مباشر عبر الايدي (ID)',
+          'توفير الكود وتفعيله فورياً عبر Midasbuy',
+          'تفعيل سريع ومباشر للرويال بلس فورياً',
+          'ضمان رسمي موثوق مائة بالمائة'
+        ]),
+        gradientClass: null,
+        commission_rate: 8,
+        productType: 'auto_keys',
+        keys: JSON.stringify(["PUBG-ABC-UC1320", "PUBG-XYZ-UC1320", "PUBG-QWE-UC1320"])
+      },
+      {
+        id: 'prod-pubg-1800',
+        name: 'شحن شدات ببجي 1800UC',
+        category: 'games',
+        price: 115.00,
+        originalPrice: 150.00,
+        period: '1800 شدة فورية',
+        stock: 35,
+        imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDDOSlnh8_DPFEpa-9U-o7j8A3KJE0PX-N1_Cv5_qO-VWn-gGvaByaflsoqHrh0m7YqJJP8_savJuHifuxTTHztb8xSFmC_Lfm1WOt0vIRXy6FoPHjjYb_kl534Im_VX-0-m3MLNIdnxu2oGeO9Yf9xA3u-DyU4y3hcDjzRMyyWcm8alN9ssrQ1VafKDmckIxzl29R8IGAhf-IFwiK_xY_cLWR3cGA1kCHnKmjVB47Zq-FqFV4-kvON1h1RtP6RX08K0FEKDzMg6mkb',
+        iconName: 'gamepad-2',
+        rating: 5.0,
+        reviewsCount: 651,
+        features: JSON.stringify([
+          'شحن رسمي وفوري مباشر عبر الايدي (ID)',
+          'أكواد ذهبية وتفعيل عبر موقع Midasbuy الرسمي',
+          'شحن الحساب في بضع ثوانٍ معدودة',
+          'ضمان رسمي موثوق مائة بالمائة'
+        ]),
+        gradientClass: null,
+        commission_rate: 8,
+        productType: 'auto_keys',
+        keys: JSON.stringify(["PUBG-ABC-UC1800", "PUBG-XYZ-UC1800"])
+      },
+      {
+        id: 'prod-pubg-3850',
+        name: 'شحن شدات ببجي 3850UC',
+        category: 'games',
+        price: 235.00,
+        originalPrice: 300.00,
+        period: '3850 شدة فورية',
+        stock: 12,
+        imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDDOSlnh8_DPFEpa-9U-o7j8A3KJE0PX-N1_Cv5_qO-VWn-gGvaByaflsoqHrh0m7YqJJP8_savJuHifuxTTHztb8xSFmC_Lfm1WOt0vIRXy6FoPHjjYb_kl534Im_VX-0-m3MLNIdnxu2oGeO9Yf9xA3u-DyU4y3hcDjzRMyyWcm8alN9ssrQ1VafKDmckIxzl29R8IGAhf-IFwiK_xY_cLWR3cGA1kCHnKmjVB47Zq-FqFV4-kvON1h1RtP6RX08K0FEKDzMg6mkb',
+        iconName: 'gamepad-2',
+        rating: 5.0,
+        reviewsCount: 887,
+        features: JSON.stringify([
+          'شحن رسمي وحصري مباشر عبر الايدي (ID)',
+          'الباقة الاحترافية الأعلى طلباً لفتح الصناديق والمواسم الرسمية',
+          'تفعيل مباشر وفوري عبر موقع Midasbuy الرسمي لـ PUBG MOBILE',
+          'ضمان رسمي موثوق مائة بالمائة'
+        ]),
+        gradientClass: null,
+        commission_rate: 8,
+        productType: 'auto_keys',
+        keys: JSON.stringify(["PUBG-ABC-UC3850", "PUBG-XYZ-UC3850"])
+      },
+      {
+        id: 'prod-pubg-8100',
+        name: 'شحن شدات ببجي 8100UC',
+        category: 'games',
+        price: 445.00,
+        originalPrice: 580.00,
+        period: '8100 شدة فورية',
+        stock: 10,
+        imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDDOSlnh8_DPFEpa-9U-o7j8A3KJE0PX-N1_Cv5_qO-VWn-gGvaByaflsoqHrh0m7YqJJP8_savJuHifuxTTHztb8xSFmC_Lfm1WOt0vIRXy6FoPHjjYb_kl534Im_VX-0-m3MLNIdnxu2oGeO9Yf9xA3u-DyU4y3hcDjzRMyyWcm8alN9ssrQ1VafKDmckIxzl29R8IGAhf-IFwiK_xY_cLWR3cGA1kCHnKmjVB47Zq-FqFV4-kvON1h1RtP6RX08K0FEKDzMg6mkb',
+        iconName: 'gamepad-2',
+        rating: 5.0,
+        reviewsCount: 1240,
+        features: JSON.stringify([
+          'بطاقة تفعيل شحن رسمي وفوري مباشر عبر الايدي (ID)',
+          'الباقة المليونية الأكبر لـ PUBG MOBILE لتفعيل الرويال باس وترقية الأسلحة المطورة وسكنات',
+          'توفير الكود وتفعيله فورياً عبر موقع Midasbuy الرسمي لـ PUBG MOBILE',
+          'دعم وضمان شحن رسمي موثوق مائة بالمائة بخصوصية تامة'
+        ]),
+        gradientClass: null,
+        commission_rate: 8,
+        productType: 'auto_keys',
+        keys: JSON.stringify(["PUBG-ABC-UC8100", "PUBG-XYZ-UC8100"])
+      }
+    ];
+
+    for (const p of extraPubgProducts) {
+      const checkExists = await db.execute({
+        sql: "SELECT COUNT(*) as count FROM rx_products WHERE id = ?",
+        args: [p.id]
+      });
+      if (Number(checkExists.rows[0].count) === 0) {
+        console.log(`Seeding extra PUBG UC pack: ${p.name}`);
+        await db.execute({
+          sql: `INSERT INTO rx_products (id, name, category, price, originalPrice, period, stock, imageUrl, iconName, rating, reviewsCount, features, gradientClass, commission_rate, productType, keys)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          args: [p.id, p.name, p.category, p.price, p.originalPrice, p.period, p.stock, p.imageUrl, p.iconName, p.rating, p.reviewsCount, p.features, p.gradientClass, p.commission_rate, p.productType, p.keys]
+        });
+      }
+    }
+
     // 3. Seed Users
     const userCheck = await db.execute("SELECT COUNT(*) as count FROM rx_users");
     const userCount = Number(userCheck.rows[0].count);
@@ -568,6 +738,32 @@ async function initDatabase() {
 
 initDatabase();
 
+// Helper to safely normalize and parse values into a clean array of strings/items (handling double stringified values)
+function ensureArray(val: any): any[] {
+  if (val === undefined || val === null) return [];
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed;
+      if (typeof parsed === 'string') {
+        const doubleParsed = JSON.parse(parsed.trim());
+        if (Array.isArray(doubleParsed)) return doubleParsed;
+      }
+    } catch (e) {
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+          return trimmed.slice(1, -1).split(',').map(s => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+        } catch (_) {}
+      }
+      return trimmed.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+    }
+  }
+  return [];
+}
+
 // API Endpoints
 
 // 1. PRODUCTS
@@ -598,17 +794,18 @@ app.get("/api/products", async (req, res) => {
         rating: Number(row.rating),
         reviewsCount: Number(row.reviewsCount),
         commission_rate: Number(row.commission_rate || 15),
-        features: row.features ? JSON.parse(row.features as string) : [],
-        extraImages: row.extraImages ? JSON.parse(row.extraImages as string) : [],
+        features: ensureArray(row.features),
+        extraImages: ensureArray(row.extraImages),
         videoUrl: row.videoUrl || "",
         isFeatured: Number(row.isFeatured || 0) === 1,
         isBestSeller: Number(row.isBestSeller || 0) === 1,
         tagText: row.tagText || "",
         productType: row.productType || "standard",
-        keys: row.keys ? JSON.parse(row.keys as string) : [],
+        keys: ensureArray(row.keys),
         requirePlayerId: Number(row.requirePlayerId || 0) === 1,
         isSold: Number(row.isSold || 0) === 1,
-        accountDetails: safeDetails
+        accountDetails: safeDetails,
+        parentId: row.parentId || ""
       };
     });
     res.json(products);
@@ -619,10 +816,11 @@ app.get("/api/products", async (req, res) => {
 
 app.post("/api/products", async (req, res) => {
   try {
-    const { id, name, category, price, originalPrice, period, stock, imageUrl, iconName, rating, reviewsCount, features, gradientClass, commission_rate, extraImages, videoUrl, isFeatured, isBestSeller, tagText, productType, keys, requirePlayerId, isSold, accountDetails } = req.body;
+    const { id, name, category, price, originalPrice, period, stock, imageUrl, iconName, rating, reviewsCount, features, gradientClass, commission_rate, extraImages, images, videoUrl, isFeatured, isBestSeller, tagText, productType, keys, requirePlayerId, isSold, accountDetails, parentId } = req.body;
+    const finalExtraImages = extraImages || images;
     await db.execute({
-      sql: `INSERT INTO rx_products (id, name, category, price, originalPrice, period, stock, imageUrl, iconName, rating, reviewsCount, features, gradientClass, commission_rate, extraImages, videoUrl, isFeatured, isBestSeller, tagText, productType, keys, requirePlayerId, isSold, accountDetails)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO rx_products (id, name, category, price, originalPrice, period, stock, imageUrl, iconName, rating, reviewsCount, features, gradientClass, commission_rate, extraImages, videoUrl, isFeatured, isBestSeller, tagText, productType, keys, requirePlayerId, isSold, accountDetails, parentId)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         id || `prod-${Date.now()}`,
         name,
@@ -635,19 +833,20 @@ app.post("/api/products", async (req, res) => {
         iconName || "box",
         Number(rating) || 5.0,
         Number(reviewsCount) || 1,
-        JSON.stringify(features || []),
+        JSON.stringify(ensureArray(features)),
         gradientClass || null,
         Number(commission_rate) || 15,
-        JSON.stringify(extraImages || []),
+        JSON.stringify(ensureArray(finalExtraImages)),
         videoUrl || "",
         isFeatured ? 1 : 0,
         isBestSeller ? 1 : 0,
         tagText || "",
         productType || "standard",
-        JSON.stringify(keys || []),
+        JSON.stringify(ensureArray(keys)),
         requirePlayerId ? 1 : 0,
         isSold ? 1 : 0,
-        JSON.stringify(accountDetails || {})
+        JSON.stringify(accountDetails || {}),
+        parentId || ""
       ]
     });
     res.json({ success: true, message: "Product created" });
@@ -659,10 +858,11 @@ app.post("/api/products", async (req, res) => {
 app.put("/api/products/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, category, price, originalPrice, period, stock, imageUrl, iconName, features, commission_rate, extraImages, videoUrl, isFeatured, isBestSeller, tagText, productType, keys, requirePlayerId, isSold, accountDetails } = req.body;
+    const { name, category, price, originalPrice, period, stock, imageUrl, iconName, features, commission_rate, extraImages, images, videoUrl, isFeatured, isBestSeller, tagText, productType, keys, requirePlayerId, isSold, accountDetails, parentId } = req.body;
+    const finalExtraImages = extraImages || images;
     await db.execute({
       sql: `UPDATE rx_products 
-            SET name = ?, category = ?, price = ?, originalPrice = ?, period = ?, stock = ?, imageUrl = ?, iconName = ?, features = ?, commission_rate = ?, extraImages = ?, videoUrl = ?, isFeatured = ?, isBestSeller = ?, tagText = ?, productType = ?, keys = ?, requirePlayerId = ?, isSold = ?, accountDetails = ?
+            SET name = ?, category = ?, price = ?, originalPrice = ?, period = ?, stock = ?, imageUrl = ?, iconName = ?, features = ?, commission_rate = ?, extraImages = ?, videoUrl = ?, isFeatured = ?, isBestSeller = ?, tagText = ?, productType = ?, keys = ?, requirePlayerId = ?, isSold = ?, accountDetails = ?, parentId = ?
             WHERE id = ?`,
       args: [
         name,
@@ -673,18 +873,19 @@ app.put("/api/products/:id", async (req, res) => {
         Number(stock),
         imageUrl || "",
         iconName || "box",
-        JSON.stringify(features || []),
+        JSON.stringify(ensureArray(features)),
         Number(commission_rate) || 15,
-        JSON.stringify(extraImages || []),
+        JSON.stringify(ensureArray(finalExtraImages)),
         videoUrl || "",
         isFeatured ? 1 : 0,
         isBestSeller ? 1 : 0,
         tagText || "",
         productType || "standard",
-        JSON.stringify(keys || []),
+        JSON.stringify(ensureArray(keys)),
         requirePlayerId ? 1 : 0,
         isSold ? 1 : 0,
         JSON.stringify(accountDetails || {}),
+        parentId || "",
         id
       ]
     });
@@ -947,7 +1148,7 @@ app.get("/api/logs", async (req, res) => {
 app.post("/api/logs", async (req, res) => {
   try {
     const { adminName, actionType, details } = req.body;
-    const timestamp = new Date().toLocaleString('ar-SA');
+    const timestamp = new Date().toLocaleString('en-US');
     await db.execute({
       sql: "INSERT INTO rx_logs (id, adminName, actionType, details, timestamp) VALUES (?, ?, ?, ?, ?)",
       args: [`log-${Date.now()}`, adminName || "مشرف المتجر", actionType, details, timestamp]
@@ -971,7 +1172,7 @@ app.get("/api/broadcasts", async (req, res) => {
 app.post("/api/broadcasts", async (req, res) => {
   try {
     const { title, body, targetAudience } = req.body;
-    const createdAt = new Date().toLocaleString('ar-SA');
+    const createdAt = new Date().toLocaleString('en-US');
     await db.execute({
       sql: "INSERT INTO rx_broadcasts (id, title, body, targetAudience, createdAt) VALUES (?, ?, ?, ?, ?)",
       args: [`broad-${Date.now()}`, title, body, targetAudience || 'all', createdAt]
@@ -987,7 +1188,7 @@ app.post("/api/admin/reply-message", async (req, res) => {
   try {
     const { text, adminName, userId, image } = req.body;
     const replyId = `msg-reply-${Date.now()}`;
-    const timestamp = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+    const timestamp = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     await db.execute({
       sql: "INSERT INTO rx_messages (id, sender, senderName, text, timestamp, userId, image, isRead) VALUES (?, ?, ?, ?, ?, ?, ?, 0)",
       args: [replyId, 'agent', adminName || "خالد العمري", text || '', timestamp, userId || '', image || '']
@@ -1103,46 +1304,88 @@ app.get("/api/users", async (req, res) => {
   }
 });
 
+app.get("/api/check-email", async (req, res) => {
+  try {
+    const { email } = req.query;
+    if (!email) {
+      return res.json({ exists: false });
+    }
+    const cleanEmail = String(email).trim().toLowerCase();
+    const check = await db.execute({
+      sql: "SELECT id FROM rx_users WHERE LOWER(email) = ?",
+      args: [cleanEmail]
+    });
+    return res.json({ exists: check.rows.length > 0 });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post("/api/login", async (req, res) => {
   try {
-    const { email, name, password } = req.body;
+    const { email, name, password, isRegistering, shippingCode } = req.body;
     if (!email) {
-      return res.status(400).json({ error: "Email is required" });
+      return res.status(400).json({ error: "البريد الإلكتروني مطلوب" });
     }
     
-    // Check if user exists
+    const cleanEmail = email.trim().toLowerCase();
+    
+    // Check if user exists (case-insensitive)
     const check = await db.execute({
-      sql: "SELECT * FROM rx_users WHERE email = ?",
-      args: [email]
+      sql: "SELECT * FROM rx_users WHERE LOWER(email) = ?",
+      args: [cleanEmail]
     });
 
-    if (check.rows.length > 0) {
-      const u = check.rows[0];
-      if (password) {
-        await db.execute({
-          sql: "UPDATE rx_users SET password = ? WHERE email = ?",
-          args: [password, email]
-        });
-        u.password = password;
+    if (isRegistering) {
+      if (check.rows.length > 0) {
+        return res.json({ error: "هذا الحساب تم تسجيله من قبل! يرجى تسجيل الدخول بدلاً من ذلك" });
       }
-      return res.json({
-        ...u,
-        balance: Number(u.balance),
+
+      // Otherwise register a new user
+      const id = `user-${Date.now()}`;
+      const cleanName = name ? name.trim() : cleanEmail.split("@")[0];
+      const avatarLetter = cleanName.charAt(0);
+      const joinDate = new Date().toISOString().split('T')[0];
+      const balance = 0.0; // Starting/initial balance is zero
+      
+      await db.execute({
+        sql: "INSERT INTO rx_users (id, name, email, balance, joinDate, status, avatarLetter, password, shippingCode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        args: [id, cleanName, cleanEmail, balance, joinDate, "نشط", avatarLetter, password || "", shippingCode || ""]
       });
+
+      return res.json({ id, name: cleanName, email: cleanEmail, balance, joinDate, status: "نشط", avatarLetter, password: password || "", shippingCode: shippingCode || "" });
+    } else {
+      // Login flow
+      if (check.rows.length > 0) {
+        const u = check.rows[0];
+        const finalName = name ? name.trim() : u.name;
+        const avatarLetter = finalName.charAt(0);
+        const updatedPassword = password !== undefined ? password : (u.password || "");
+        
+        // If a password was previously set and is not empty, check it!
+        if (u.password && u.password !== "" && password !== undefined && u.password !== password) {
+          return res.json({ error: "كلمة المرور غير صحيحة! يرجى كتابة الرمز الصحيح الخاص بك" });
+        }
+
+        // Update details if password needs updating (only if the existing didn't have one, or to make sure it is updated)
+        await db.execute({
+          sql: "UPDATE rx_users SET password = ?, name = ?, avatarLetter = ? WHERE id = ?",
+          args: [updatedPassword, finalName, avatarLetter, u.id]
+        });
+        
+        return res.json({
+          ...u,
+          name: finalName,
+          email: cleanEmail,
+          avatarLetter,
+          password: updatedPassword,
+          shippingCode: u.shippingCode || "",
+          balance: Number(u.balance),
+        });
+      } else {
+        return res.json({ error: "هذا الحساب غير مسجل من قبل! يمكنك الضغط على 'إنشاء حساب جديد' للتسجيل" });
+      }
     }
-
-    // Otherwise register a new user
-    const id = `user-${Date.now()}`;
-    const avatarLetter = name ? name.charAt(0) : email.charAt(0).toUpperCase();
-    const joinDate = new Date().toISOString().split('T')[0];
-    const balance = 0.0; // Starting balance is zero
-    
-    await db.execute({
-      sql: "INSERT INTO rx_users (id, name, email, balance, joinDate, status, avatarLetter, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      args: [id, name || email.split("@")[0], email, balance, joinDate, "نشط", avatarLetter, password || ""]
-    });
-
-    res.json({ id, name: name || email.split("@")[0], email, balance, joinDate, status: "نشط", avatarLetter, password: password || "" });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -1322,8 +1565,9 @@ app.post("/api/orders", async (req, res) => {
       let creds: any = {};
       let orderStatus = 'تم تسليم الطلب';
 
-      if (dbProduct.productType === 'auto_keys') {
-        const keysArr = dbProduct.keys ? JSON.parse(dbProduct.keys as string) : [];
+      const keysArr = ensureArray(dbProduct.keys);
+
+      if (dbProduct.productType === 'auto_keys' || keysArr.length > 0) {
         if (keysArr.length < quantity) {
           return res.status(400).json({ error: `نعتذر، لا تتوفر مفاتيح/حسابات كافية حالياً للمنتج: ${product.name}` });
         }
@@ -1375,7 +1619,7 @@ app.post("/api/orders", async (req, res) => {
       // Insert Order record
       const randId = Math.floor(10000 + Math.random() * 90000);
       const orderId = `ord-${randId}`;
-      const dateStr = new Date().toLocaleDateString('ar-EG');
+      const dateStr = new Date().toLocaleDateString('en-US');
       
       const safeSubtotal = isNaN(Number(subtotal)) ? 0 : Number(subtotal);
       const safeCommRate = isNaN(Number(commRate)) ? 15 : Number(commRate);
@@ -1383,8 +1627,8 @@ app.post("/api/orders", async (req, res) => {
       const safeVendorShare = isNaN(Number(vendorShare)) ? 0 : Number(vendorShare);
 
       await db.execute({
-        sql: `INSERT INTO rx_orders (id, productId, productName, price, date, status, credentials, imageUrl, commission_rate, store_share, vendor_share)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        sql: `INSERT INTO rx_orders (id, productId, productName, price, date, status, credentials, imageUrl, commission_rate, store_share, vendor_share, userId)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           String(orderId),
           String(dbProduct.id),
@@ -1396,7 +1640,8 @@ app.post("/api/orders", async (req, res) => {
           String(dbProduct.imageUrl || ""),
           safeCommRate,
           safeStoreShare,
-          safeVendorShare
+          safeVendorShare,
+          String(userId)
         ]
       });
 
@@ -1408,7 +1653,8 @@ app.post("/api/orders", async (req, res) => {
         date: dateStr,
         status: orderStatus,
         credentials: creds,
-        imageUrl: dbProduct.imageUrl
+        imageUrl: dbProduct.imageUrl,
+        userId: String(userId)
       });
     }
 
@@ -1420,7 +1666,7 @@ app.post("/api/orders", async (req, res) => {
     });
 
     // Register a Transaction log
-    const txnId = `TXN-${Date.now().toString().slice(-4)}`;
+    const txnId = `TXN-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
     const txProdName = items[0].product.name + (items.length > 1 ? ` (+${items.length - 1})` : '');
     const iconBg = items[0].product.category === 'games' ? 'bg-[#5865F2]' : 'bg-[#d4af37]';
     
@@ -1792,13 +2038,13 @@ async function checkRecordsAndCredit() {
               args: [newBal, String(targetUser.id)]
             });
 
-            const txnId = `TXN-AC-${Date.now().toString().slice(-4)}`;
+            const txnId = `TXN-AC-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
             await db.execute({
               sql: `INSERT INTO rx_transactions (id, productName, customerName, price, status, date, iconBg, imageUrl, store_share, vendor_share)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               args: [
                 txnId,
-                `شحن رصيد المحفظة عبر آسياسيل (${amountIQD} د.ع)`,
+                `شحن رصيد المحفظة عبر آسياسيل (${amountIQD} $)`,
                 String(targetUser.name || 'مجهول'),
                 creditAmount,
                 'مكتمل',
@@ -1937,7 +2183,7 @@ app.post("/api/asiacell/topup", async (req, res) => {
 
     let targetUser;
     if (userQuery.rows.length === 0) {
-      const fallbackId = `user-${Date.now().toString().slice(-6)}`;
+      const fallbackId = `user-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
       const fallbackName = username.includes('@') ? username.split('@')[0] : username.trim();
       const joinDate = new Date().toISOString().split('T')[0];
       await db.execute({
@@ -2010,13 +2256,13 @@ app.post("/api/asiacell/topup", async (req, res) => {
         args: [newBal, String(targetUser.id)]
       });
 
-      const txnId = `TXN-AC-${Date.now().toString().slice(-4)}`;
+      const txnId = `TXN-AC-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
       await db.execute({
         sql: `INSERT INTO rx_transactions (id, productName, customerName, price, status, date, iconBg, imageUrl, store_share, vendor_share)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           txnId,
-          `شحن كارت تعبئة آسياسيل (${finalAmount} د.ع)`,
+          `شحن كارت تعبئة آسياسيل (${finalAmount} $)`,
           String(targetUser.name || 'مجهول'),
           creditAmount,
           'مكتمل',
@@ -2037,7 +2283,7 @@ app.post("/api/asiacell/topup", async (req, res) => {
       success: true,
       amountIQD: finalAmount,
       credited: creditAmount,
-      message: `تم شحن كود التعبئة بنجاح! تم إضافة ${creditAmount} د.ع إلى رصيدك.`
+      message: `تم شحن كود التعبئة بنجاح! تم إضافة ${creditAmount} $ إلى رصيدك.`
     });
   } catch (err: any) {
     console.error('[Asiacell Card TopUp Error]', err);
@@ -2070,7 +2316,7 @@ app.post("/api/asiacell/transfer", async (req, res) => {
 
     let targetUser;
     if (userQuery.rows.length === 0) {
-      const fallbackId = `user-${Date.now().toString().slice(-6)}`;
+      const fallbackId = `user-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
       const fallbackName = username.includes('@') ? username.split('@')[0] : username.trim();
       const joinDate = new Date().toISOString().split('T')[0];
       await db.execute({
@@ -2188,13 +2434,13 @@ app.post("/api/asiacell/confirm", async (req, res) => {
         args: [newBal, String(targetUser.id)]
       });
 
-      const txnId = `TXN-AC-${Date.now().toString().slice(-4)}`;
+      const txnId = `TXN-AC-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
       await db.execute({
         sql: `INSERT INTO rx_transactions (id, productName, customerName, price, status, date, iconBg, imageUrl, store_share, vendor_share)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           txnId,
-          `تحويل رصيد آسياسيل (${session.amount} د.ع)`,
+          `تحويل رصيد آسياسيل (${session.amount} $)`,
           String(targetUser.name || 'مجهول'),
           creditAmount,
           'مكتمل',
@@ -2215,7 +2461,7 @@ app.post("/api/asiacell/confirm", async (req, res) => {
       success: true,
       credited: creditAmount,
       amountIQD: session.amount,
-      message: `تم التحويل بنجاح! تمت إضافة ${creditAmount} د.ع إلى رصيد محفظتك الرقمية.`
+      message: `تم التحويل بنجاح! تمت إضافة ${creditAmount} $ إلى رصيد محفظتك الرقمية.`
     });
   } catch (err: any) {
     console.error('[Asiacell Transfer Confirm Error]', err);
@@ -2252,7 +2498,7 @@ app.post("/api/messages", async (req, res) => {
   try {
     const { sender, senderName, text, userId, image } = req.body;
     const msgId = `msg-${Date.now()}`;
-    const timestamp = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+    const timestamp = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
     // Store user message
     await db.execute({
@@ -2272,7 +2518,7 @@ app.post("/api/messages", async (req, res) => {
     }
 
     const replyId = `msg-reply-${Date.now()}`;
-    const replyTime = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+    const replyTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
     // Store reply in db as unread for the user (isRead = 0)
     await db.execute({

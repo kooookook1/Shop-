@@ -35,11 +35,13 @@ interface ProfileProps {
   userId?: string;
   userEmail?: string;
   userPassword?: string;
+  userShippingCode?: string;
   onUpdateProfile?: (userId: string, newName: string, newEmail?: string, newPassword?: string) => void;
   onAddBalance?: (userId: string, amount: number) => void;
   onSelectProduct?: (product: Product) => void;
   activeSubSection?: 'none' | 'favorites' | 'settings' | 'about' | 'recharge';
   setActiveSubSection?: (sec: 'none' | 'favorites' | 'settings' | 'about' | 'recharge') => void;
+  onLogout?: () => void;
 }
 
 export default function Profile({ 
@@ -55,11 +57,13 @@ export default function Profile({
   userId = '',
   userEmail = '',
   userPassword = '',
+  userShippingCode = '',
   onUpdateProfile,
   onAddBalance,
   onSelectProduct,
   activeSubSection: propsActiveSubSection,
-  setActiveSubSection: propsSetActiveSubSection
+  setActiveSubSection: propsSetActiveSubSection,
+  onLogout
 }: ProfileProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   
@@ -388,7 +392,21 @@ export default function Profile({
                 <div className="flex items-center gap-3">
                   <div className="text-right">
                     <h1 className="text-lg font-black text-white leading-tight">{userName}</h1>
-                    <p className="text-[10px] text-gray-400">مرحباً بك مجدداً معنا</p>
+                    {userShippingCode ? (
+                      <div 
+                        onClick={() => {
+                          onCopyText(userShippingCode, "رمز الشحن المميز");
+                          setCopiedId('shipping');
+                          setTimeout(() => setCopiedId(null), 1500);
+                        }}
+                        className="text-[10px] text-amber-400 bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 rounded-md mt-1 font-mono flex items-center justify-end gap-1 cursor-pointer hover:bg-amber-400/20 transition-all select-none"
+                      >
+                        <span>{copiedId === 'shipping' ? 'تم النسخ!' : `رمز الشحن: ${userShippingCode}`}</span>
+                        {copiedId === 'shipping' ? <CheckCircle2 size={10} /> : <Copy size={10} />}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-gray-400">مرحباً بك مجدداً معنا</p>
+                    )}
                   </div>
                   <div className="w-14 h-14 bg-gradient-to-tr from-cyan-400/20 to-blue-500/20 border-2 border-cyan-400 rounded-full flex items-center justify-center text-2xl font-bold text-cyan-400 select-none">
                     {(userName && typeof userName === 'string') ? userName.charAt(0) : 'أ'}
@@ -402,7 +420,7 @@ export default function Profile({
                 
                 <div className="relative z-10 text-right space-y-1">
                   <span className="text-[10px] text-slate-800 font-bold tracking-widest uppercase">الرصيد المتاح بالمحفظة</span>
-                  <p className="text-2xl font-black">{(userBalance ?? 0).toLocaleString('ar-EG')} د.ع</p>
+                  <p className="text-2xl font-black">{(userBalance ?? 0).toLocaleString('en-US')} $</p>
                 </div>
 
                 <div className="relative z-10 flex items-center gap-2">
@@ -534,6 +552,23 @@ export default function Profile({
                     </div>
                   </div>
                 </button>
+
+                {onLogout && (
+                  <button 
+                    onClick={onLogout}
+                    className="w-full flex items-center justify-between p-4 bg-rose-500/[0.03] hover:bg-rose-500/10 transition-colors text-right cursor-pointer"
+                  >
+                    <ChevronLeft size={16} className="text-rose-400" />
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-bold text-rose-400">تسجيل الخروج من الحساب 👋</span>
+                      <div className="p-2 bg-rose-500/15 rounded-xl text-rose-400">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                        </svg>
+                      </div>
+                    </div>
+                  </button>
+                )}
               </div>
             </section>
           </motion.div>
@@ -596,7 +631,7 @@ export default function Profile({
                         </div>
                         <div className="text-right font-sans">
                           <h3 className="font-bold text-xs text-white leading-tight">{p.name}</h3>
-                          <p className="text-[10px] text-gray-400 mt-1">{(p.price ?? 0).toLocaleString('ar-EG')} د.ع</p>
+                          <p className="text-[10px] text-gray-400 mt-1">{(p.price ?? 0).toLocaleString('en-US')} $</p>
                         </div>
                       </div>
 
@@ -1029,13 +1064,13 @@ export default function Profile({
 
                   {/* Fast presets buttons */}
                   <div className="grid grid-cols-4 gap-2 font-sans">
-                    {[5000, 10000, 25000, 50000].map((val) => (
+                    {[10, 20, 50, 100].map((val) => (
                       <button
                         key={val}
                         onClick={() => handleChargeWallet(val)}
                         className="py-2.5 glass-button text-amber-300 font-bold text-[10px] rounded-xl hover:bg-amber-400/10 hover:border-amber-400/20 cursor-pointer"
                       >
-                        +{val.toLocaleString('ar-EG')} د.ع
+                        +{val.toLocaleString('en-US')} $
                       </button>
                     ))}
                   </div>
@@ -1052,7 +1087,7 @@ export default function Profile({
                       type="number" 
                       value={rechargeAmount}
                       onChange={(e) => setRechargeAmount(e.target.value)}
-                      placeholder="أدخل مبلغاً مخصصاً (د.ع)"
+                      placeholder="أدخل مبلغاً مخصصاً ($)"
                       className="flex-grow bg-slate-950/60 border border-white/10 rounded-2xl px-4 py-3 text-xs text-white outline-none focus:border-amber-400/50 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none font-sans"
                     />
                   </div>
@@ -1064,7 +1099,7 @@ export default function Profile({
                 <div className="space-y-4 text-right">
                   {/* Exchange rate display card */}
                   <div className="p-3 bg-red-950/20 border border-red-500/10 rounded-2xl flex items-center justify-between text-[11px] font-sans">
-                    <span className="font-mono text-rose-400 font-bold">1 د.ع = 1 د.ع</span>
+                    <span className="font-mono text-rose-400 font-bold">1 $ = 1 $</span>
                     <span className="text-gray-400 font-bold">شحن مباشر 100% بدون رسوم إضافية</span>
                   </div>
 
@@ -1180,12 +1215,12 @@ export default function Profile({
                         /* Sub workflow: Credit Transfer */
                         <div className="space-y-3 font-sans">
                           <div className="space-y-1">
-                            <label className="text-[10px] text-gray-300 font-bold">قيمة الرصيد المراد تحويله (دينار عراقي)</label>
+                            <label className="text-[10px] text-gray-300 font-bold">قيمة الرصيد المراد تحويله (دولار $)</label>
                             <input
                               type="number"
                               value={acAmountIQD}
                               onChange={(e) => setAcAmountIQD(e.target.value)}
-                              placeholder="الحد الأدنى: 250 دينار"
+                              placeholder="الحد الأدنى: 1 دولار"
                               className="w-full bg-slate-950/80 border border-white/10 rounded-2xl px-4 py-3 text-right font-mono text-sm text-white outline-none focus:border-rose-500/50"
                             />
                             
@@ -1193,7 +1228,7 @@ export default function Profile({
                             {parseInt(acAmountIQD) > 0 && (
                               <div className="bg-rose-950/30 border border-rose-500/20 p-2.5 rounded-xl flex items-center justify-between text-xs text-rose-300 mt-1">
                                 <span className="font-mono font-extrabold text-[11px]">
-                                  +{parseInt(acAmountIQD).toLocaleString('ar-EG')} د.ع
+                                  +{parseInt(acAmountIQD).toLocaleString('en-US')} $
                                 </span>
                                 <span className="text-[9px]">الرصيد المضاف لمحفظة المتجر:</span>
                               </div>
@@ -1224,7 +1259,7 @@ export default function Profile({
                               placeholder="أدخل رمز كارد التعبئة المكون من 14 رقماً"
                               className="w-full bg-slate-950/80 border border-white/10 rounded-2xl px-4 py-3 text-center font-mono text-sm text-white outline-none focus:border-rose-500/50"
                             />
-                            <p className="text-[8px] text-gray-500 font-sans text-right">سيتم شحن كارت الشحن فورياً وتقدير قيمته ثم إيداع المبلغ المقابل في محفظتك تلقائياً بالدينار العراقي.</p>
+                            <p className="text-[8px] text-gray-500 font-sans text-right">سيتم شحن كارت الشحن فورياً وتقدير قيمته ثم إيداع المبلغ المقابل في محفظتك تلقائياً بالدولار الأمريكي ($).</p>
                           </div>
 
                           <button
@@ -1306,7 +1341,7 @@ export default function Profile({
                     <span className="text-[10px] font-bold text-white block">طريقة الشحن اليدوية المؤقتة:</span>
                     <ol className="text-[10px] text-gray-400 space-y-2 leading-relaxed text-right dir-rtl">
                       <li>١. تواصل مع الإدارة بالضغط على أزرار الدعم الحية أدناه لطلب عنوان محفظة التحويل (USDT TRC-20).</li>
-                      <li>٢. قم بتحويل القيمة المطلوبة (سعر الإيداع المعتمد هو ١,٥٠٠ د.ع لكل دولار).</li>
+                      <li>٢. قم بتحويل القيمة المطلوبة بالدولار $ مباشرة (1 إلى 1).</li>
                       <li>٣. أرسل لقطة شاشة للعملية الناجحة مع عنوان إيميلك المسجل بالمتجر ليتم شحن محفظتك خلال ثوانٍ.</li>
                     </ol>
                   </div>

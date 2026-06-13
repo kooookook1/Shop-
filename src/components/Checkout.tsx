@@ -66,7 +66,7 @@ export default function Checkout({ cartItems, onRemoveItem, onClearCart, onCompl
       } else {
         const percentEquivalent = Math.min(0.99, Number(coupon.value) / subtotal);
         setPromoDiscount(percentEquivalent);
-        setPromoFeedback(`تم تطبيق كود الخصم الفاخر بنجاح! تم خصم ${coupon.value} د.ع من السلة.`);
+        setPromoFeedback(`تم تطبيق كود الخصم الفاخر بنجاح! تم خصم ${coupon.value} $ من السلة.`);
       }
     } catch (err) {
       setPromoFeedback('عذراً، حدث خطأ أثناء تطبيق كود الخصم.');
@@ -147,7 +147,7 @@ export default function Checkout({ cartItems, onRemoveItem, onClearCart, onCompl
                         <p className="text-[10px] text-gray-400">
                           {isSub ? (item.selectedPlan === 'yearly' ? 'اشتراك سنوي شامل' : 'اشتراك شهري مرن') : 'شراء وتملّك فوري لكود أو حساب كامل'} (الكمية: {item.quantity})
                         </p>
-                        <div className="text-xs font-semibold text-cyan-400 mt-1">{((itemPrice || 0) * (item.quantity || 1)).toLocaleString('ar-EG')} د.ع</div>
+                        <div className="text-xs font-semibold text-cyan-400 mt-1">{((itemPrice || 0) * (item.quantity || 1)).toLocaleString('en-US')} $</div>
                       </div>
 
                       <div className="w-16 h-16 bg-slate-900 rounded-xl flex items-center justify-center shrink-0 border border-white/5 overflow-hidden">
@@ -189,13 +189,13 @@ export default function Checkout({ cartItems, onRemoveItem, onClearCart, onCompl
                 <div className="space-y-0.5">
                   <span className="text-[10px] text-gray-400 block">رصيدك الحالي</span>
                   <span className="text-sm font-extrabold text-white font-mono">
-                    {(userBalance || 0).toLocaleString('ar-EG')} د.ع
+                    {(userBalance || 0).toLocaleString('en-US')} $
                   </span>
                 </div>
                 <div className="space-y-0.5">
                   <span className="text-[10px] text-gray-400 block">المبلغ المطلوب للطلب</span>
                   <span className="text-sm font-extrabold text-amber-400 font-mono">
-                    {(totalVal || 0).toLocaleString('ar-EG')} د.ع
+                    {(totalVal || 0).toLocaleString('en-US')} $
                   </span>
                 </div>
               </div>
@@ -210,7 +210,7 @@ export default function Checkout({ cartItems, onRemoveItem, onClearCart, onCompl
                 </div>
                 <div className="flex items-center gap-1.5 text-right">
                   <span className={`text-xs font-black ${isInsufficient ? 'text-red-400 font-mono' : 'text-emerald-400 font-mono'}`}>
-                    {Math.max(0, remainingBalance || 0).toLocaleString('ar-EG')} د.ع
+                    {Math.max(0, remainingBalance || 0).toLocaleString('en-US')} $
                   </span>
                   <span className="text-[10px] text-gray-400">الرصيد المتبقي بعد الشراء</span>
                 </div>
@@ -261,24 +261,24 @@ export default function Checkout({ cartItems, onRemoveItem, onClearCart, onCompl
           {/* REVENUE/PRICE DETAILS */}
           <section className="glass-card rounded-2xl p-4 space-y-3">
             <div className="flex justify-between items-center text-xs text-gray-400">
-              <span className="font-semibold text-white">{subtotal.toLocaleString('ar-EG')} د.ع</span>
+              <span className="font-semibold text-white">{subtotal.toLocaleString('en-US')} $</span>
               <span>المجموع الفرعي</span>
             </div>
             
             {appliedPromo && (
               <div className="flex justify-between items-center text-xs text-emerald-400 font-medium">
-                <span className="font-semibold">- {discountVal.toLocaleString('ar-EG')} د.ع</span>
+                <span className="font-semibold">- {discountVal.toLocaleString('en-US')} $</span>
                 <span>الخصم (%٣٠)</span>
               </div>
             )}
 
             <div className="flex justify-between items-center text-xs text-emerald-400 font-medium">
-              <span className="font-extrabold">٠ د.ع</span>
+              <span className="font-extrabold">٠ $</span>
               <span>الضريبة المضافة (%٠) معفاة 🎉</span>
             </div>
 
             <div className="pt-3 border-t border-white/5 flex justify-between items-center">
-              <span className="text-xl font-black text-cyan-400">{totalVal.toLocaleString('ar-EG')} د.ع</span>
+              <span className="text-xl font-black text-cyan-400">{totalVal.toLocaleString('en-US')} $</span>
               <span className="text-sm font-bold text-white">إجمالي الحساب</span>
             </div>
           </section>
@@ -306,7 +306,7 @@ export default function Checkout({ cartItems, onRemoveItem, onClearCart, onCompl
               ) : (
                 <>
                   <span>تأكيد الدفع والخصم من المحفظة</span>
-                  <span className="text-xs bg-slate-950/20 py-0.5 px-2 rounded-full font-mono">{totalVal.toLocaleString('ar-EG')} د.ع</span>
+                  <span className="text-xs bg-slate-950/20 py-0.5 px-2 rounded-full font-mono">{totalVal.toLocaleString('en-US')} $</span>
                 </>
               )}
             </motion.button>
@@ -343,11 +343,11 @@ export default function Checkout({ cartItems, onRemoveItem, onClearCart, onCompl
                 {/* Billing specs inside modal */}
                 <div className="bg-slate-950/50 rounded-2xl p-3.5 border border-white/5 space-y-2 text-xs">
                   <div className="flex justify-between items-center text-gray-400">
-                    <span className="font-bold text-white font-mono">{totalVal.toLocaleString('ar-EG')} د.ع</span>
+                    <span className="font-bold text-white font-mono">{totalVal.toLocaleString('en-US')} $</span>
                     <span>قيمة المشتريات (المخصوم)</span>
                   </div>
                   <div className="flex justify-between items-center text-emerald-400 pt-2 border-t border-white/5">
-                    <span className="font-black font-mono">{remainingBalance.toLocaleString('ar-EG')} د.ع</span>
+                    <span className="font-black font-mono">{remainingBalance.toLocaleString('en-US')} $</span>
                     <span className="font-bold">رصيدك المتبقي بعد العملية</span>
                   </div>
                 </div>

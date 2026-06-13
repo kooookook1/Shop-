@@ -283,7 +283,7 @@ export default function RechargePage({
             
             <div className="relative z-10 text-right space-y-1">
               <span className="text-[10px] text-slate-800 font-bold tracking-widest uppercase">الرصيد المتاح بالمحفظة</span>
-              <p className="text-2xl font-black">{(userBalance ?? 0).toLocaleString('ar-EG')} د.ع</p>
+              <p className="text-2xl font-black">{(userBalance ?? 0).toLocaleString('en-US')} $</p>
             </div>
 
             <div className="relative z-10 p-2.5 bg-slate-950/10 rounded-2xl border border-white/10 shrink-0">
@@ -358,7 +358,7 @@ export default function RechargePage({
               <div className="space-y-4 text-right">
                 {/* Exchange rate display card */}
                 <div className="p-3 bg-red-950/20 border border-red-500/10 rounded-2xl flex items-center justify-between text-[11px] font-sans">
-                  <span className="font-mono text-rose-400 font-bold">1 د.ع = 1 د.ع</span>
+                  <span className="font-mono text-rose-400 font-bold">1 $ = 1 $</span>
                   <span className="text-gray-400 font-bold">شحن مباشر 100% بدون رسوم إضافية</span>
                 </div>
 
@@ -490,7 +490,7 @@ export default function RechargePage({
                       </div>
                     ) : (
                       <div className="space-y-2 text-right">
-                        <label className="text-[10px] text-gray-400">مبلغ التحويل المطلوب (د.ع) 💰</label>
+                        <label className="text-[10px] text-gray-400">مبلغ التحويل المطلوب (دولار $) 💰</label>
                         <input
                           type="number"
                           value={acAmountIQD}
@@ -549,7 +549,7 @@ export default function RechargePage({
             {rechargeMethod === 'crypto' && (
               <div className="space-y-4 text-right animate-fadeIn">
                 <div className="p-3 bg-emerald-950/20 border border-emerald-500/10 rounded-2xl flex items-center justify-between text-[11px] font-sans">
-                  <span className="font-mono text-emerald-400 font-bold">1 USDT = 1350 د.ع</span>
+                  <span className="font-mono text-emerald-400 font-bold">1 USDT = 1 $</span>
                   <span className="text-gray-400 font-bold">شحن فوري + بونص 5% مجاناً 🎁</span>
                 </div>
 

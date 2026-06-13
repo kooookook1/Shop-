@@ -110,7 +110,7 @@ export function Purchases({ orders, onCopyText }: PurchasesProps) {
 
                       <div className="text-left shrink-0 pl-1 flex flex-col items-end gap-1.5 h-full justify-center">
                         <p className="text-[15px] font-black text-white dir-ltr tracking-tight drop-shadow-md">
-                          {(order.price ?? 0).toLocaleString('ar-EG')} د.ع
+                          {(order.price ?? 0).toLocaleString('en-US')} $
                         </p>
                         <div className={`flex items-center gap-1 text-[9px] font-bold px-2.5 py-1 rounded-full ${
                           order.status === 'تم تسليم الطلب' ? 'text-amber-300 bg-amber-400/15 border border-amber-400/30' : 

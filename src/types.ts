@@ -20,6 +20,7 @@ export interface Product {
   accountDetails?: any;
   isSold?: boolean;
   extraImages?: string;
+  parentId?: string;
 }
 
 export interface User {
@@ -31,6 +32,7 @@ export interface User {
   status: 'VIP' | 'نشط' | 'محظور';
   avatarLetter: string;
   password?: string;
+  shippingCode?: string;
 }
 
 export interface Order {
@@ -52,6 +54,7 @@ export interface Order {
   commission_rate?: number;
   store_share?: number;
   vendor_share?: number;
+  isReceiptConfirmed?: boolean;
 }
 
 export interface Message {

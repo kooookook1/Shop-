@@ -241,12 +241,12 @@ export default function App() {
   }, [isLoggedIn, currentUser, currentUserObj, userBalance, activeTab]);
 
   // Login handler
-  const handleLogin = async (userName: string, email: string, password?: string) => {
+  const handleLogin = async (userName: string, email: string, password?: string, isRegistering?: boolean, shippingCode?: string) => {
     try {
       const res = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, name: userName, password })
+        body: JSON.stringify({ email, name: userName, password, isRegistering, shippingCode })
       });
       const userObj = await res.json();
       if (userObj.error) {
@@ -258,11 +258,31 @@ export default function App() {
       const parsedBalance = typeof userObj.balance === 'number' ? userObj.balance : parseFloat(userObj.balance);
       setUserBalance(isNaN(parsedBalance) ? 0.00 : parsedBalance);
       setIsLoggedIn(true);
-      showToast(`مرحباً بك يا ${userObj.name} في عالم ريكسون الرقمي!`, 'success');
+      showToast(isRegistering ? `تم إنشاء حسابك بنجاح! مرحباً بك يا ${userObj.name} 👋` : `مرحباً بك مجدداً يا ${userObj.name} في عالم ريكسون الرقمي!`, 'success');
       syncAllData(userObj);
     } catch (err) {
       showToast("حدث خطأ أثناء تسجيل الدخول", "info");
     }
+  };
+
+  // Logout handler
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setCurrentUser('');
+    setCurrentUserObj(null);
+    setUserBalance(0.00);
+    setCartItems([]);
+    try {
+      localStorage.removeItem('rixon_is_logged_in');
+      localStorage.removeItem('rixon_current_user_name');
+      localStorage.removeItem('rixon_current_user_obj');
+      localStorage.removeItem('rixon_user_balance');
+      localStorage.removeItem('rixon_active_tab');
+      localStorage.removeItem('rixon_favorites');
+    } catch (e) {
+      console.error(e);
+    }
+    showToast('تم تسجيل الخروج بنجاح 👋', 'success');
   };
 
   // Adding item to cart
@@ -379,7 +399,7 @@ export default function App() {
         text,
         userId: uId,
         image: image || '',
-        timestamp: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
+        timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
       }]);
 
       await fetch("/api/messages", {
@@ -444,7 +464,7 @@ export default function App() {
       });
       const data = await res.json();
       if (!data.error) {
-        showToast(`تم شحن رصيد محفظتك بمبلغ ${amount} د.ع بنجاح! 🚀`, 'success');
+        showToast(`تم شحن رصيد محفظتك بمبلغ ${amount} $ بنجاح! 🚀`, 'success');
         await syncAllData();
       }
     } catch (err) {
@@ -498,6 +518,9 @@ export default function App() {
     return <LoginScreen onLogin={handleLogin} />;
   }
 
+  const activeUserId = currentUserObj?.id || users.find(u => u.name === currentUser || u.email === currentUserObj?.email || u.id === currentUser)?.id || currentUser || 'guest_user';
+  const userOrders = orders.filter(o => o.userId === activeUserId || o.userId === currentUser || o.userId === currentUserObj?.id || o.userId === currentUserObj?.email);
+
   return (
     <div className="flex flex-col min-h-screen bg-[#050614] text-white selection:bg-cyan-400 selection:text-slate-950 select-none">
       
@@ -528,6 +551,7 @@ export default function App() {
               >
                 <ProductDetails 
                   product={selectedProduct} 
+                  allProducts={products}
                   onBack={() => setSelectedProduct(null)}
                   onAddToCart={(p, plan, playerId) => handleAddToCart(p, plan, playerId)}
                   onBuyNow={(p, plan, playerId) => handleBuyNow(p, plan, playerId)}
@@ -580,7 +604,7 @@ export default function App() {
 
                 {activeTab === 'purchases' && (
                   <Purchases
-                    orders={orders}
+                    orders={userOrders}
                     onCopyText={handleCopyText}
                   />
                 )}
@@ -589,7 +613,7 @@ export default function App() {
                   <Profile 
                     userName={currentUser}
                     userBalance={userBalance}
-                    orders={orders}
+                    orders={userOrders}
                     onOpenChat={() => setActiveTab('support')}
                     onCopyText={handleCopyText}
                     onConfirmReceipt={handleConfirmReceipt}
@@ -599,11 +623,13 @@ export default function App() {
                     userId={currentUserObj?.id || users.find(u => u.name === currentUser || u.email === currentUserObj?.email)?.id || currentUser || 'guest_user'}
                     userEmail={currentUserObj?.email || 'kooookook1@gmail.com'}
                     userPassword={currentUserObj?.password || ''}
+                    userShippingCode={currentUserObj?.shippingCode || ''}
                     onUpdateProfile={handleUpdateProfile}
                     onAddBalance={handleAddBalance}
                     onSelectProduct={(p) => { setSelectedProduct(p); }}
                     activeSubSection={profileSubSection}
                     setActiveSubSection={setProfileSubSection}
+                    onLogout={handleLogout}
                   />
                 )}
 
