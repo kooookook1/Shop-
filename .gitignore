@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Local runtime database (auto-created & seeded on server start)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
