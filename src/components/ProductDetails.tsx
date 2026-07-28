@@ -16,6 +16,7 @@ export default function ProductDetails({ product, allProducts, onBack, onAddToCa
   const [playerId, setPlayerId] = useState('');
   const [isImageFullscreen, setIsImageFullscreen] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
+  const [heroImgError, setHeroImgError] = useState(false);
 
   const subProducts = allProducts ? allProducts.filter(p => p.parentId === product.id) : [];
 
@@ -28,6 +29,7 @@ export default function ProductDetails({ product, allProducts, onBack, onAddToCa
     setActiveProduct(subs.length > 0 ? subs[0] : product);
     setImageIndex(0);
     setPlayerId('');
+    setHeroImgError(false);
   }, [product, allProducts]);
 
   // Safely parse extra images from database (which are loaded as string array or json string)
@@ -113,11 +115,12 @@ export default function ProductDetails({ product, allProducts, onBack, onAddToCa
             className="absolute inset-0 z-0 cursor-zoom-in flex items-center justify-center bg-slate-950/40"
             onClick={() => setIsImageFullscreen(true)}
           >
-            {allImages.length > 0 ? (
-              <img 
-                src={allImages[imageIndex]} 
-                alt={`${activeProduct.name} - ${imageIndex + 1}`} 
+            {allImages.length > 0 && !heroImgError ? (
+              <img
+                src={allImages[imageIndex]}
+                alt={`${activeProduct.name} - ${imageIndex + 1}`}
                 referrerPolicy="no-referrer"
+                onError={() => setHeroImgError(true)}
                 className="w-full h-full object-cover opacity-90 transition-all duration-300 transform group-hover:scale-[1.02]"
               />
             ) : (

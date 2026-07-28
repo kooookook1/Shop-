@@ -14,15 +14,32 @@ body {
   background-color: var(--color-dark-bg);
   color: #ffffff;
   overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* Glassmorphism Classes */
+/* ===== Ambient app background glow ===== */
+.app-ambient-bg {
+  background:
+    radial-gradient(600px 280px at 85% -60px, rgba(34, 211, 238, 0.08), transparent 60%),
+    radial-gradient(500px 240px at 0% 120px, rgba(124, 58, 237, 0.07), transparent 60%),
+    radial-gradient(400px 200px at 50% 0px, rgba(212, 175, 55, 0.04), transparent 60%);
+}
+
+/* ===== Glassmorphism Classes ===== */
 .glass-card {
   background: rgba(255, 255, 255, 0.03);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+}
+
+.glass-card-elevated {
+  background: rgba(255, 255, 255, 0.045);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .glass-button {
@@ -41,6 +58,21 @@ body {
   box-shadow: 0 4px 15px rgba(34, 211, 238, 0.15);
 }
 
+/* ===== Typography helpers ===== */
+.text-gradient {
+  background: linear-gradient(120deg, #67e8f9 0%, #38bdf8 45%, #a5b4fc 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.text-gradient-gold {
+  background: linear-gradient(120deg, #fde68a 0%, #f59e0b 55%, #d4af37 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
 .glow-cyan {
   text-shadow: 0 0 10px rgba(56, 189, 248, 0.8), 0 0 20px rgba(56, 189, 248, 0.4);
 }
@@ -49,24 +81,62 @@ body {
   box-shadow: 0 0 15px rgba(212, 175, 55, 0.25);
 }
 
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
+/* ===== Product card polish ===== */
+.product-card {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.25s ease, box-shadow 0.25s ease;
+  will-change: transform;
 }
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+.product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 40px rgba(34, 211, 238, 0.12), 0 4px 16px rgba(0, 0, 0, 0.35);
+  border-color: rgba(34, 211, 238, 0.35);
+}
+.product-card:active { transform: translateY(-1px) scale(0.99); }
+
+/* ===== Media shimmer placeholder ===== */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.media-shimmer {
+  background: linear-gradient(110deg, rgba(255,255,255,0.03) 30%, rgba(255,255,255,0.09) 48%, rgba(255,255,255,0.03) 62%);
+  background-size: 200% 100%;
+  animation: shimmer 2.2s linear infinite;
 }
 
-/* Animations */
+/* ===== Ribbon badge ===== */
+.ribbon-badge {
+  clip-path: polygon(0 0, 100% 0, 85% 100%, 0 100%);
+}
+
+/* ===== Scrollbars ===== */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #0b0d1e; }
+::-webkit-scrollbar-thumb { background: rgba(34, 211, 238, 0.25); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(34, 211, 238, 0.5); }
+
+/* ===== Selection ===== */
+::selection { background: rgba(34, 211, 238, 0.85); color: #04121e; }
+
+/* ===== Animations ===== */
 @keyframes pulseGlow {
-  0%, 100% {
-    opacity: 0.3;
-  }
-  50% {
-    opacity: 0.7;
-  }
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
 }
+.glow-pulse { animation: pulseGlow 3s infinite; }
 
-.glow-pulse {
-  animation: pulseGlow 3s infinite;
+@keyframes floatY {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.float-slow { animation: floatY 5s ease-in-out infinite; }
+
+/* ===== Focus visibility (accessibility) ===== */
+button:focus-visible, a:focus-visible, input:focus-visible {
+  outline: 2px solid rgba(34, 211, 238, 0.6);
+  outline-offset: 2px;
+  border-radius: inherit;
 }
