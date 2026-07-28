@@ -27,7 +27,7 @@ export function Purchases({ orders, onCopyText }: PurchasesProps) {
       {/* HEADER SECTION */}
       <div className="px-6 py-6 pb-2 text-right relative z-10 shrink-0 mb-auto mt-6">
         <h1 className="text-4xl font-black text-white tracking-tight drop-shadow-lg">
-          <span className="text-transparent bg-clip-text bg-gradient-to-l from-amber-400 via-amber-200 to-amber-500">مشترياتي</span>
+          <span className="text-transparent bg-clip-text bg-gradient-to-l from-amber-400 via-amber-200 to-amber-500">مشترياتي 🧾</span>
         </h1>
         <p className="text-xs text-gray-300 mt-2.5 max-w-[280px] mr-auto leading-relaxed drop-shadow">
           سجل طلباتك وحساباتك المشتراة. كل بياناتك محفوظة هنا بأمان وتشفير تام.
@@ -53,7 +53,7 @@ export function Purchases({ orders, onCopyText }: PurchasesProps) {
                 <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center">
                   <FileText size={28} className="text-white/20" />
                 </div>
-                <p className="max-w-[200px] leading-relaxed">لم تقم بأي طلبات شراء بعد. تسوق في المتجر لطلب مفاتيحك الرقمية والحسابات!</p>
+                <p className="max-w-[200px] leading-relaxed">لم تقم بأي طلبات شراء بعد 🛍️ تسوق في المتجر لطلب مفاتيحك الرقمية والحسابات!</p>
               </motion.div>
             ) : (
               orders.map((order, index) => {

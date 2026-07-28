@@ -405,7 +405,7 @@ export default function Profile({
                         {copiedId === 'shipping' ? <CheckCircle2 size={10} /> : <Copy size={10} />}
                       </div>
                     ) : (
-                      <p className="text-[10px] text-gray-400">مرحباً بك مجدداً معنا</p>
+                      <p className="text-[10px] text-gray-400">مرحباً بك مجدداً معنا 👋</p>
                     )}
                   </div>
                   <div className="w-14 h-14 bg-gradient-to-tr from-cyan-400/20 to-blue-500/20 border-2 border-cyan-400 rounded-full flex items-center justify-center text-2xl font-bold text-cyan-400 select-none">
@@ -419,7 +419,7 @@ export default function Profile({
                 <div className="absolute inset-0 opacity-5 bg-black" style={{ backgroundImage: 'radial-gradient(circle at 10% 20%, white 0%, transparent 40%)' }}></div>
                 
                 <div className="relative z-10 text-right space-y-1">
-                  <span className="text-[10px] text-slate-800 font-bold tracking-widest uppercase">الرصيد المتاح بالمحفظة</span>
+                  <span className="text-[10px] text-slate-800 font-bold tracking-widest uppercase">الرصيد المتاح بالمحفظة 💰</span>
                   <p className="text-2xl font-black">{(userBalance ?? 0).toLocaleString('en-US')} $</p>
                 </div>
 
@@ -431,7 +431,7 @@ export default function Profile({
                     }}
                     className="bg-slate-950 hover:bg-slate-900 text-white font-extrabold text-[10px] py-1.5 px-3 rounded-xl flex items-center gap-1 transition-all active:scale-95 shadow-md border border-white/5 cursor-pointer"
                   >
-                    <span>إعادة شحن</span>
+                    <span>إعادة شحن ⚡</span>
                     <Plus size={11} className="text-amber-400" />
                   </button>
 
@@ -494,7 +494,7 @@ export default function Profile({
                 >
                   <ChevronLeft size={16} className="text-gray-400" />
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-semibold text-gray-200">محادثة الدعم الفني الفاخر</span>
+                    <span className="text-xs font-semibold text-gray-200">محادثة الدعم الفني الفاخر 💬</span>
                     <div className="p-2 bg-blue-500/10 rounded-xl text-blue-400">
                       <HelpCircle size={16} />
                     </div>
@@ -520,7 +520,7 @@ export default function Profile({
                 >
                   <ChevronLeft size={16} className="text-gray-400" />
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-semibold text-gray-200">إعدادات الحساب</span>
+                    <span className="text-xs font-semibold text-gray-200">إعدادات الحساب ⚙️</span>
                     <div className="p-2 bg-purple-500/10 rounded-xl text-purple-400">
                       <Settings size={16} />
                     </div>
@@ -533,7 +533,7 @@ export default function Profile({
                 >
                   <ChevronLeft size={16} className="text-gray-400" />
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-semibold text-gray-200">المنتجات المفضلة</span>
+                    <span className="text-xs font-semibold text-gray-200">المنتجات المفضلة ❤️</span>
                     <div className="p-2 bg-rose-500/10 rounded-xl text-rose-400">
                       <Heart size={16} />
                     </div>
@@ -546,7 +546,7 @@ export default function Profile({
                 >
                   <ChevronLeft size={16} className="text-gray-400" />
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-semibold text-gray-200">حول النظام والمنصة</span>
+                    <span className="text-xs font-semibold text-gray-200">حول النظام والمنصة ℹ️</span>
                     <div className="p-2 bg-cyan-500/10 rounded-xl text-cyan-400">
                       <Info size={16} />
                     </div>

@@ -96,7 +96,7 @@ export default function SupportChat({ messages, onSendMessage, onBackToStore, us
 
         <div className="flex items-center gap-3">
           <div className="text-right">
-            <h1 className="font-extrabold text-sm leading-tight text-white">محادثة الدعم الفاخر</h1>
+            <h1 className="font-extrabold text-sm leading-tight text-white">محادثة الدعم الفاخر 💎</h1>
             <p className="text-emerald-400 text-[9px] font-semibold flex items-center justify-end gap-1 mt-0.5">
               <span>متصل الآن</span>
               <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>

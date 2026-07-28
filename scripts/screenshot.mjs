@@ -94,7 +94,7 @@ const steps = {
 
   product: async page => {
     // Clear any leftover search text so the target card is visible
-    const searchInput = page.getByPlaceholder('ابحث...');
+    const searchInput = page.getByPlaceholder(/ابحث/);
     if (await searchInput.count()) { await searchInput.fill(''); await sleep(600); }
     // exact=true avoids hitting the banner headline ("باقة ChatGPT Plus السنوية")
     const card = page.getByText('ChatGPT Plus', { exact: true }).first();
@@ -154,7 +154,7 @@ const steps = {
     // Register/enter the admin account (client gate: email must be zero@gmail.com)
     await register(page, ADMIN);
     await sleep(1500);
-    const adminNav = page.locator('nav button', { hasText: 'لوحةالتحكم' });
+    const adminNav = page.locator('nav button', { hasText: 'لوحة التحكم' });
     if (await adminNav.count()) {
       await adminNav.click();
       await sleep(1800);

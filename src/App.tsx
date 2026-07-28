@@ -694,7 +694,7 @@ export default function App() {
               }`}
             >
               <User size={22} className={activeTab === 'profile' ? 'text-amber-400 scale-110' : ''} />
-              <span className="text-[10px] font-sans">حسابي</span>
+              <span className="text-[10px] font-sans">حسابي 👤</span>
             </button>
 
             {/* Tab: Purchases */}
@@ -705,7 +705,7 @@ export default function App() {
               }`}
             >
               <FileText size={22} className={activeTab === 'purchases' ? 'text-cyan-400 scale-110' : ''} />
-              <span className="text-[10px]">مشترياتي</span>
+              <span className="text-[10px]">مشترياتي 🧾</span>
             </button>
 
             {/* Tab: Cart */}
@@ -716,7 +716,7 @@ export default function App() {
               }`}
             >
               <ShoppingBag size={22} className={activeTab === 'cart' ? 'text-cyan-400 scale-110' : ''} />
-              <span className="text-[10px]">السلة</span>
+              <span className="text-[10px]">السلة 🛒</span>
               {cartItems.length > 0 && (
                 <span className="absolute -top-1 -right-1.5 bg-cyan-400 text-slate-950 text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-bounce">
                   {cartItems.reduce((acc, i) => acc + i.quantity, 0)}
@@ -740,7 +740,7 @@ export default function App() {
                    </span>
                  )}
                </div>
-               <span className="text-[10px]">الدعم</span>
+               <span className="text-[10px]">الدعم 💬</span>
              </button>
 
             {/* Tab: Admin Dashboard */}
@@ -752,7 +752,7 @@ export default function App() {
                 }`}
               >
                 <Settings size={22} className={activeTab === 'admin' ? 'text-cyan-400 scale-110' : ''} />
-                <span className="text-[10px]">لوحةالتحكم</span>
+                <span className="text-[10px]">لوحة التحكم 👑</span>
               </button>
             )}
 
@@ -764,7 +764,7 @@ export default function App() {
               }`}
             >
               <Home size={22} className={activeTab === 'home' ? 'text-cyan-400 scale-110' : ''} />
-              <span className="text-[10px]">الرئيسية</span>
+              <span className="text-[10px]">الرئيسية 🏠</span>
             </button>
 
           </nav>

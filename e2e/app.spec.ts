@@ -49,7 +49,7 @@ test.describe('R3XON store critical path', () => {
 
     // 2 ─ Search filters products live
     await page.locator('button:has(svg.lucide-search)').first().click();
-    await page.getByPlaceholder('ابحث...').fill(tag);
+    await page.getByPlaceholder(/ابحث/).fill(tag);
     await expect(page.locator(`text=${product.name}`).first()).toBeVisible();
     await expect(page.locator('text=Spotify Premium')).toHaveCount(0);
 

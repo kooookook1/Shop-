@@ -119,7 +119,7 @@ export default function Checkout({ cartItems, onRemoveItem, onClearCart, onCompl
           
           {/* SUMMARY INVENTORY CARDS */}
           <section className="space-y-3">
-            <h2 className="text-sm font-bold text-gray-400 text-right">ملخص السلة</h2>
+            <h2 className="text-sm font-bold text-gray-400 text-right">ملخص السلة 🧾</h2>
             
             <div className="glass-card rounded-2xl overflow-hidden divide-y divide-white/5">
               <AnimatePresence>
@@ -171,7 +171,7 @@ export default function Checkout({ cartItems, onRemoveItem, onClearCart, onCompl
 
           {/* Wallet Payment Status Dashboard */}
           <section className="space-y-3">
-            <h2 className="text-sm font-bold text-gray-400 text-right">طريقة الدفع المعتمدة</h2>
+            <h2 className="text-sm font-bold text-gray-400 text-right">طريقة الدفع المعتمدة 💳</h2>
             
             <div className="glass-card rounded-2xl p-4 border border-cyan-500/25 bg-gradient-to-r from-slate-950 via-slate-900 to-cyan-950/10 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-20 h-0.5 bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]"></div>
@@ -305,7 +305,7 @@ export default function Checkout({ cartItems, onRemoveItem, onClearCart, onCompl
                 <span>رصيدك غير كافٍ للشراء ⚠️</span>
               ) : (
                 <>
-                  <span>تأكيد الدفع والخصم من المحفظة</span>
+                  <span>تأكيد الدفع والخصم من المحفظة ✅</span>
                   <span className="text-xs bg-slate-950/20 py-0.5 px-2 rounded-full font-mono">{totalVal.toLocaleString('en-US')} $</span>
                 </>
               )}

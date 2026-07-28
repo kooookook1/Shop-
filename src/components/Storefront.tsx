@@ -102,9 +102,9 @@ const BannerSlide: React.FC<BannerSlideProps> = ({ slide, product, onClick }) =>
       )}
 
       <div className="absolute bottom-4 right-4 left-4 text-right z-10 space-y-1.5 pointer-events-none">
-        <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-2">
           <div className="bg-gradient-to-l from-amber-300 to-amber-500 text-slate-950 text-[8px] font-black px-2.5 py-1 rounded-lg shadow-lg shadow-amber-500/30 flex items-center gap-1">
-            <Star size={9} className="fill-slate-950" /> عرض حصري
+            <Star size={9} className="fill-slate-950" /> عرض حصري 👑
           </div>
         </div>
         <h2 className="text-base font-black text-white drop-shadow-lg leading-snug">{slide.title}</h2>
@@ -160,7 +160,7 @@ export default function Storefront({
       .then(data => {
         const activeCats = data.filter((c: any) => c.isActive === 1 && c.isHidden === 0);
         setCategories([
-          { id: 'all', name: 'الجميع', imageOrIcon: 'Sparkles' },
+          { id: 'all', name: 'الجميع ✨', imageOrIcon: 'Sparkles' },
           ...activeCats
         ]);
       })
@@ -279,7 +279,7 @@ export default function Storefront({
               <input
                 autoFocus
                 type="text"
-                placeholder="ابحث..."
+                placeholder="ابحث عن منتجك... 🔍"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="bg-white/8 border border-cyan-400/30 text-white rounded-full text-xs py-1.5 px-3 pr-8 w-full outline-none text-right focus:border-cyan-300 focus:ring-2 focus:ring-cyan-400/40 transition-all"
@@ -395,8 +395,8 @@ export default function Storefront({
             <div className="mx-auto w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
               <PackageX size={26} className="text-gray-500" />
             </div>
-            <p className="text-gray-300 text-sm font-bold">لا توجد منتجات مطابقة</p>
-            <p className="text-gray-500 text-[11px]">جرّب كلمة بحث أخرى أو قسماً مختلفاً</p>
+            <p className="text-gray-300 text-sm font-bold">لا توجد منتجات مطابقة 🔍</p>
+            <p className="text-gray-500 text-[11px]">جرّب كلمة بحث أخرى أو قسماً مختلفاً 💡</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3.5">
@@ -423,7 +423,7 @@ export default function Storefront({
                     {isNew && (
                       <div className="bg-gradient-to-l from-emerald-400 to-teal-500 text-[8px] text-slate-950 px-2 py-0.5 rounded-lg font-black tracking-wide flex items-center gap-1 shadow-lg shadow-emerald-500/40">
                         <span className="w-1.5 h-1.5 rounded-full bg-slate-900 animate-ping" />
-                        جديد
+                        جديد ✨
                       </div>
                     )}
                     {discount > 0 && (
@@ -436,11 +436,11 @@ export default function Storefront({
                   {/* Stock indicator */}
                   <div className="absolute top-3 right-3 z-30 pointer-events-none">
                     {isOut ? (
-                      <span className="text-[8px] font-black bg-red-500/15 text-red-300 border border-red-500/30 px-2 py-0.5 rounded-full backdrop-blur-sm">تم البيع</span>
+                      <span className="text-[8px] font-black bg-red-500/15 text-red-300 border border-red-500/30 px-2 py-0.5 rounded-full backdrop-blur-sm">تم البيع ⛔</span>
                     ) : lowStock ? (
-                      <span className="text-[8px] font-black bg-amber-500/15 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full backdrop-blur-sm animate-pulse">بقي {p.stock} فقط</span>
+                      <span className="text-[8px] font-black bg-amber-500/15 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full backdrop-blur-sm animate-pulse">بقي {p.stock} فقط ⏳</span>
                     ) : (
-                      <span className="text-[8px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full backdrop-blur-sm">متوفر {p.stock}</span>
+                      <span className="text-[8px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full backdrop-blur-sm">متوفر {p.stock} ✅</span>
                     )}
                   </div>
 

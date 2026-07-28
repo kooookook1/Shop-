@@ -1378,10 +1378,12 @@ export default function AdminDashboard({
         </button>
         <div>
           <div className="text-right text-lg font-black text-white flex items-center gap-1.5 justify-end">
-            <span className="bg-gradient-to-r from-red-500 via-amber-500 to-cyan-500 bg-clip-text text-transparent">لوحة الإشراف العليا</span>
-            <Lock size={16} className="text-amber-400" />
+            <span className="bg-gradient-to-r from-red-500 via-amber-500 to-cyan-500 bg-clip-text text-transparent drop-shadow-[0_0_14px_rgba(251,191,36,0.25)]">لوحة الإشراف العليا 👑</span>
+            <span className="p-1 rounded-lg bg-amber-400/10 border border-amber-400/25">
+              <Lock size={13} className="text-amber-400" />
+            </span>
           </div>
-          <p className="text-[10px] text-gray-400 mt-0.5">التحكم الدائم برصيد الفئات والمنتجات والتشغيل</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">التحكم الدائم برصيد الفئات والمنتجات والتشغيل ⚙️✨</p>
         </div>
       </header>
 
@@ -1404,8 +1406,8 @@ export default function AdminDashboard({
               onClick={() => setActiveTab(item.tab as any)}
               className={`flex items-center gap-2 px-4 py-3 rounded-2xl text-[11px] font-bold whitespace-nowrap transition-all border shrink-0 ${
                 isActive 
-                  ? 'bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/10 font-black border-cyan-300' 
-                  : 'bg-white/5 text-gray-300 border-white/5 hover:bg-white/10 hover:text-white'
+                  ? 'bg-gradient-to-l from-cyan-300 via-cyan-400 to-sky-500 text-slate-950 shadow-lg shadow-cyan-400/35 font-black border-cyan-300 scale-[1.04]' 
+                  : 'bg-white/5 text-gray-300 border-white/5 hover:bg-white/10 hover:text-white hover:border-cyan-400/20'
               }`}
             >
               <Icon size={14} />
@@ -1456,74 +1458,95 @@ export default function AdminDashboard({
             
             {/* Bento Statistics Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="bg-[#1e1b4b]/60 border border-indigo-500/10 p-4 rounded-3xl text-right">
-                <span className="text-[10px] text-indigo-300 font-bold block mb-1">المبيعات الكلية</span>
-                <p className="text-[17px] font-black tracking-tight text-white">{grossIncome.toLocaleString('en-US')} $</p>
-                <span className="text-[8px] text-gray-300 mt-1 block">توزيع عوائد وتسويات</span>
-              </div>
-
-              <div className="bg-[#1c1d1a]/80 border border-green-500/10 p-4 rounded-3xl text-right">
-                <span className="text-[10px] text-emerald-400 font-bold block mb-1">صافي أرباح ريكسون</span>
-                <p className="text-[17px] font-black tracking-tight text-emerald-400">{netCommission.toLocaleString('en-US')} $</p>
-                <div className="text-[8px] text-gray-400 mt-1">العمولة المهيأة (%15 كمتوسط)</div>
-              </div>
-
-              <div className="bg-[#1f2025]/80 border border-amber-500/10 p-4 rounded-3xl text-right">
-                <span className="text-[10px] text-amber-300 font-bold block mb-1">مستحقات الشركاء</span>
-                <p className="text-[17px] font-black tracking-tight text-amber-400">{partnerShares.toLocaleString('en-US')} $</p>
-                <span className="text-[8px] text-gray-400 mt-1 block">قابلة للسحب للبنوك</span>
-              </div>
-
-              <div className="bg-[#111827]/80 border border-cyan-500/10 p-4 rounded-3xl text-right">
-                <span className="text-[10px] text-cyan-400 font-bold block mb-1">العملاء النشِطين</span>
-                <p className="text-[17px] font-black tracking-tight text-white">{users.length} عميل</p>
-                <span className="text-[8px] text-gray-400 mt-1 block">مكتمل تشغيله لـ {vipUsersCount} VIP</span>
-              </div>
+              {[
+                { emoji: '💵', label: 'المبيعات الكلية', value: `${grossIncome.toLocaleString('en-US')} $`, sub: 'توزيع عوائد وتسويات 📊', grad: 'from-indigo-500/25 via-violet-500/10 to-transparent', ring: 'border-indigo-400/25', text: 'text-indigo-200', valueCls: 'text-white' },
+                { emoji: '💎', label: 'صافي أرباح ريكسون', value: `${netCommission.toLocaleString('en-US')} $`, sub: 'العمولة المهيأة (%15 كمتوسط) 📈', grad: 'from-emerald-500/25 via-teal-500/10 to-transparent', ring: 'border-emerald-400/25', text: 'text-emerald-300', valueCls: 'text-emerald-300' },
+                { emoji: '🤝', label: 'مستحقات الشركاء', value: `${partnerShares.toLocaleString('en-US')} $`, sub: 'قابلة للسحب للبنوك 🏦', grad: 'from-amber-500/25 via-yellow-500/10 to-transparent', ring: 'border-amber-400/25', text: 'text-amber-300', valueCls: 'text-amber-300' },
+                { emoji: '👥', label: 'العملاء النشِطين', value: `${users.length} عميل`, sub: `مكتمل تشغيله لـ ${vipUsersCount} VIP ⭐`, grad: 'from-cyan-500/25 via-sky-500/10 to-transparent', ring: 'border-cyan-400/25', text: 'text-cyan-300', valueCls: 'text-white' },
+              ].map((card, i) => (
+                <motion.div
+                  key={card.label}
+                  initial={{ opacity: 0, y: 18 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.07, duration: 0.35, ease: 'easeOut' }}
+                  className={`relative overflow-hidden bg-gradient-to-br ${card.grad} bg-slate-900/60 border ${card.ring} p-4 rounded-3xl text-right`}
+                >
+                  <span className="absolute -top-3 -left-3 text-[42px] opacity-15 float-slow select-none pointer-events-none">{card.emoji}</span>
+                  <div className="flex items-center justify-end gap-1.5 mb-1.5">
+                    <span className={`text-[10px] ${card.text} font-bold`}>{card.label}</span>
+                    <span className="text-sm drop-shadow">{card.emoji}</span>
+                  </div>
+                  <p className={`text-[17px] font-black tracking-tight ${card.valueCls}`}>{card.value}</p>
+                  <span className="text-[8px] text-gray-400 mt-1 block">{card.sub}</span>
+                </motion.div>
+              ))}
             </div>
 
             {/* Simulated interactive sales aggregates */}
-            <div className="bg-slate-900/50 border border-white/5 p-4 rounded-3xl space-y-3.5">
+            <div className="bg-slate-900/50 border border-white/5 p-4 rounded-3xl space-y-3.5 relative overflow-hidden">
+              <span className="absolute -top-4 -left-4 text-[64px] opacity-[0.07] float-slow select-none pointer-events-none">💹</span>
               <div className="flex items-center justify-between">
-                <span className="text-[10px] text-gray-400">تدفق مالي مستمر</span>
-                <h3 className="text-xs font-bold text-white">توزيع الإيرادات والأرباح</h3>
+                <span className="text-[10px] text-gray-400">تدفق مالي مستمر 🔄</span>
+                <h3 className="text-xs font-bold text-white">توزيع الإيرادات والأرباح 💹</h3>
               </div>
               
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between items-center py-1">
                   <span className="font-mono font-bold text-cyan-400">{Number(dailyRev).toLocaleString('en-US')} $</span>
-                  <span className="text-gray-400">الأرباح التقديرية اليومية</span>
+                  <span className="text-gray-400">الأرباح التقديرية اليومية 🌞</span>
                 </div>
-                <div className="w-full bg-white/5 h-1 rounded-full"><div className="bg-cyan-400 h-1 rounded-full" style={{ width: '40%' }}></div></div>
+                <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                  <motion.div initial={{ width: 0 }} animate={{ width: '40%' }} transition={{ duration: 0.9, ease: 'easeOut', delay: 0.15 }} className="bg-gradient-to-l from-cyan-300 to-sky-500 h-1.5 rounded-full shadow-[0_0_10px_rgba(34,211,238,0.5)]" />
+                </div>
 
                 <div className="flex justify-between items-center py-1">
                   <span className="font-mono font-bold text-amber-400">{Number(weeklyRev).toLocaleString('en-US')} $</span>
-                  <span className="text-gray-400">الأرباح التقديرية الأسبوعية</span>
+                  <span className="text-gray-400">الأرباح التقديرية الأسبوعية 📊</span>
                 </div>
-                <div className="w-full bg-white/5 h-1 rounded-full"><div className="bg-amber-400 h-1 rounded-full" style={{ width: '70%' }}></div></div>
+                <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                  <motion.div initial={{ width: 0 }} animate={{ width: '70%' }} transition={{ duration: 0.9, ease: 'easeOut', delay: 0.3 }} className="bg-gradient-to-l from-amber-300 to-orange-500 h-1.5 rounded-full shadow-[0_0_10px_rgba(251,191,36,0.5)]" />
+                </div>
 
                 <div className="flex justify-between items-center py-1">
                   <span className="font-mono font-bold text-emerald-400">{Number(monthlyRev).toLocaleString('en-US')} $</span>
-                  <span className="text-gray-400">الأرباح التقديرية الشهرية</span>
+                  <span className="text-gray-400">الأرباح التقديرية الشهرية 🗓️</span>
                 </div>
-                <div className="w-full bg-white/5 h-1 rounded-full"><div className="bg-emerald-400 h-1 rounded-full" style={{ width: '100%' }}></div></div>
+                <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                  <motion.div initial={{ width: 0 }} animate={{ width: '100%' }} transition={{ duration: 0.9, ease: 'easeOut', delay: 0.45 }} className="bg-gradient-to-l from-emerald-300 to-teal-500 h-1.5 rounded-full shadow-[0_0_10px_rgba(52,211,153,0.5)]" />
+                </div>
               </div>
             </div>
 
             {/* Dynamic statistics visualizers */}
-            <div className="bg-slate-900/50 border border-white/5 p-4 rounded-3xl">
-              <h3 className="text-xs font-bold text-white mb-4 text-right">أقوى المنتجات الرقمية مبيعاً</h3>
+            <div className="bg-slate-900/50 border border-white/5 p-4 rounded-3xl relative overflow-hidden">
+              <span className="absolute -top-4 -left-4 text-[64px] opacity-[0.07] float-slow select-none pointer-events-none">🏆</span>
+              <h3 className="text-xs font-bold text-white mb-4 text-right">أقوى المنتجات الرقمية مبيعاً 🏆</h3>
               <div className="divide-y divide-white/5">
                 {products.slice(0, 3).map((p, idx) => (
-                  <div key={p.id || `best-${idx}`} className="flex items-center justify-between py-2 text-xs">
-                    <span className="font-bold text-gray-400">الترتيب #{idx + 1}</span>
+                  <motion.div
+                    key={p.id || `best-${idx}`}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.2 + idx * 0.1, duration: 0.35 }}
+                    className="flex items-center justify-between py-2.5 text-xs"
+                  >
+                    <span className={`text-base w-8 h-8 rounded-xl flex items-center justify-center font-black shrink-0 ${
+                      idx === 0 ? 'bg-amber-400/15 border border-amber-400/30' : idx === 1 ? 'bg-slate-300/10 border border-slate-300/25' : 'bg-orange-700/15 border border-orange-600/30'
+                    }`}>
+                      {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
+                    </span>
                     <div className="flex items-center gap-2">
                       <div className="text-right">
                         <p className="font-bold text-white">{p.name}</p>
-                        <span className="text-[10px] text-gray-400">تم بيع {150 - Number(p.stock)} وحدة</span>
+                        <span className="text-[10px] text-gray-400">تم بيع {150 - Number(p.stock)} وحدة 🔥</span>
                       </div>
-                      {p.imageUrl && <img src={p.imageUrl} className="w-8 h-8 rounded-lg object-cover" alt="" referrerPolicy="no-referrer" />}
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} className="w-9 h-9 rounded-xl object-cover border border-white/10" alt="" referrerPolicy="no-referrer" />
+                      ) : (
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500/15 to-indigo-500/15 border border-white/10 flex items-center justify-center text-sm">📦</div>
+                      )}
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             </div>
@@ -1554,17 +1577,19 @@ export default function AdminDashboard({
               </button>
               <div className="text-right">
                 <h2 className="text-sm font-black text-white flex items-center gap-1.5 justify-end">
-                  <span>إدارة فئات وأكواد PUBG Mobile UC</span>
-                  <Zap size={16} className="text-yellow-400 fill-yellow-400" />
+                  <span>إدارة فئات وأكواد PUBG Mobile UC ⚡</span>
+                  <span className="p-1.5 rounded-xl bg-yellow-400/10 border border-yellow-400/25">
+                    <Zap size={14} className="text-yellow-400 fill-yellow-400" />
+                  </span>
                 </h2>
-                <p className="text-[10px] text-gray-400 mt-0.5">رفع وتحديث فوري للأكواد المتسلسلة التلقائية</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">رفع وتحديث فوري للأكواد المتسلسلة التلقائية 🔋</p>
               </div>
             </div>
 
             {/* Inventory Stock Overview Table */}
             <div className="bg-slate-900/60 border border-white/5 rounded-3xl p-4 overflow-hidden space-y-3">
               <h3 className="text-xs font-bold text-gray-300 text-right flex items-center justify-end gap-1">
-                <span>ملخص المخزون ومعدل المبيعات للفئات</span>
+                  <span>ملخص المخزون ومعدل المبيعات للفئات 📦</span>
                 <Activity size={13} className="text-cyan-400" />
               </h3>
 
@@ -1636,7 +1661,7 @@ export default function AdminDashboard({
               <div className="flex items-center justify-between">
                 <span className="text-[10px] bg-green-400/10 text-green-400 px-2.5 py-0.5 rounded-full font-bold border border-green-500/15">شحن آلي فوري</span>
                 <h3 className="text-xs font-black text-white flex items-center gap-1">
-                  <span>تعبئة وتحديث مخزن الأكواد فورا</span>
+                  <span>تعبئة وتحديث مخزن الأكواد فورا 🔋</span>
                   <Upload size={14} className="text-cyan-400" />
                 </h3>
               </div>
@@ -1786,10 +1811,12 @@ export default function AdminDashboard({
               </button>
               <div className="text-right">
                 <h2 className="text-sm font-black text-white flex items-center gap-1.5 justify-end">
-                  <span>معرض الحسابات الرقمية المميزة للبيع</span>
-                  <Gamepad size={16} className="text-amber-400" />
+                  <span>معرض الحسابات الرقمية المميزة للبيع 🎮</span>
+                  <span className="p-1.5 rounded-xl bg-amber-400/10 border border-amber-400/25">
+                    <Gamepad size={14} className="text-amber-400" />
+                  </span>
                 </h2>
-                <p className="text-[10px] text-gray-400 mt-0.5">ببجي، تيك توك، انستقرام، تويتر وأرقام تلقائية</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">ببجي 🎮، تيك توك 📱، انستقرام 📸، تويتر 🐦 وأرقام تلقائية ✈️</p>
               </div>
             </div>
 
@@ -2017,28 +2044,33 @@ export default function AdminDashboard({
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
               <div className="text-right">
                 <h2 className="text-sm font-black text-white flex items-center gap-1.5 justify-end">
-                  <span>التقارير المالية والتحليلات الضريبية</span>
-                  <DollarSign size={16} className="text-emerald-400" />
+                  <span>التقارير المالية والتحليلات الضريبية 💰</span>
+                  <span className="p-1.5 rounded-xl bg-emerald-400/10 border border-emerald-400/25">
+                    <DollarSign size={14} className="text-emerald-400" />
+                  </span>
                 </h2>
-                <p className="text-[10px] text-gray-400 mt-0.5 font-sans">معدل الإيرادات الفعلية، الأرباح، والعمولات المقبوضة</p>
+                <p className="text-[10px] text-gray-400 mt-0.5 font-sans">معدل الإيرادات الفعلية، الأرباح، والعمولات المقبوضة 📈</p>
               </div>
 
               {/* Grid 1: Sales Gross Revenue by Duration */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 text-right">
                 <div className="bg-[#0f172a]/80 border border-indigo-500/10 p-4 rounded-3xl relative overflow-hidden">
-                  <span className="text-[10px] text-indigo-400 block mb-1 font-bold">المبيعات اليومية (اليوم)</span>
+                  <span className="absolute -top-2 -left-2 text-[40px] opacity-15 float-slow select-none pointer-events-none">🌞</span>
+                  <span className="text-[10px] text-indigo-400 block mb-1 font-bold">المبيعات اليومية 🌞</span>
                   <p className="text-lg font-black text-white font-mono">{actualDailyRevenue.toLocaleString('en-US')} $</p>
                   <p className="text-[9.5px] text-emerald-400 mt-1 font-sans">✓ صافي العمولة: {dailyProfit.toLocaleString('en-US')} $</p>
                 </div>
 
                 <div className="bg-[#0c2e1b]/40 border border-emerald-500/10 p-4 rounded-3xl relative overflow-hidden">
-                  <span className="text-[10px] text-emerald-400 block mb-1 font-bold">المبيعات الشهرية (الشهر الحالي)</span>
+                  <span className="absolute -top-2 -left-2 text-[40px] opacity-15 float-slow select-none pointer-events-none">🗓️</span>
+                  <span className="text-[10px] text-emerald-400 block mb-1 font-bold">المبيعات الشهرية 🗓️</span>
                   <p className="text-lg font-black text-emerald-400 font-mono">{actualMonthlyRevenue.toLocaleString('en-US')} $</p>
                   <p className="text-[9.5px] text-gray-300 mt-1 font-sans">✓ صافي العمولة: {monthlyProfit.toLocaleString('en-US')} $</p>
                 </div>
 
                 <div className="bg-[#1e1b4b]/80 border border-amber-500/10 p-4 rounded-3xl relative overflow-hidden">
-                  <span className="text-[10px] text-amber-300 block mb-1 font-bold">المبيعات السنوية (العام الحالي)</span>
+                  <span className="absolute -top-2 -left-2 text-[40px] opacity-15 float-slow select-none pointer-events-none">📅</span>
+                  <span className="text-[10px] text-amber-300 block mb-1 font-bold">المبيعات السنوية 📅</span>
                   <p className="text-lg font-black text-amber-400 font-mono">{actualYearlyRevenue.toLocaleString('en-US')} $</p>
                   <p className="text-[9.5px] text-gray-300 mt-1 font-sans">✓ صافي العمولة: {yearlyProfit.toLocaleString('en-US')} $</p>
                 </div>
@@ -2058,7 +2090,7 @@ export default function AdminDashboard({
 
               {/* Transactions Ledger Table */}
               <div className="bg-slate-900/60 border border-white/5 rounded-3xl p-4 overflow-hidden space-y-3">
-                <h3 className="text-xs font-bold text-gray-300 text-right">أحدث التسويات والتحركات المالية بالبوابة</h3>
+                <h3 className="text-xs font-bold text-gray-300 text-right">أحدث التسويات والتحركات المالية بالبوابة 💳</h3>
 
                 <div className="overflow-x-auto no-scrollbar">
                   <table className="w-full text-right text-xs border-collapse divide-y divide-white/5" dir="rtl">
@@ -2121,7 +2153,7 @@ export default function AdminDashboard({
                 <Plus size={16} />
                 <span>إضافة قسم جديد</span>
               </button>
-              <h2 className="text-xs font-bold text-gray-300">أقسام المتجر المتاحة للد فرى</h2>
+              <h2 className="text-xs font-bold text-gray-300">أقسام المتجر المتاحة للعرض 📁</h2>
             </div>
 
             <div className="space-y-2">
@@ -2211,7 +2243,7 @@ export default function AdminDashboard({
                   <PlusCircle size={16} />
                   <span>إضافة منتج رقمي</span>
                 </button>
-                <h2 className="text-xs font-bold text-gray-300">مخزن الاشتراكات الرقمية</h2>
+                <h2 className="text-xs font-bold text-gray-300">مخزن الاشتراكات الرقمية 📦</h2>
               </div>
 
               {/* Instant Search bar */}
@@ -2329,7 +2361,7 @@ export default function AdminDashboard({
                 <Tag size={16} />
                 <span>إنشاء كود خصم جديد</span>
               </button>
-              <h2 className="text-xs font-bold text-gray-300">أكواد خصم العملاء الفعالة</h2>
+              <h2 className="text-xs font-bold text-gray-300">أكواد خصم العملاء الفعالة 🎟️</h2>
             </div>
 
             <div className="space-y-2.5">
@@ -2384,12 +2416,12 @@ export default function AdminDashboard({
                 <button
                   type="button"
                   onClick={handleExportOrdersCSV}
-                  className="bg-emerald-500 text-slate-950 px-4 py-2.5 rounded-2xl text-xs font-black flex items-center gap-1.5"
+                  className="bg-gradient-to-l from-emerald-400 to-teal-500 text-slate-950 px-4 py-2.5 rounded-2xl text-xs font-black flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 hover:brightness-110 transition-all"
                 >
                   <Download size={14} />
-                  <span>تصدير الطلبات CSV</span>
+                  <span>تصدير الطلبات CSV 📊</span>
                 </button>
-                <h2 className="text-xs font-bold text-gray-300">تفاصيل وتلقينات حسابات البيع</h2>
+                <h2 className="text-xs font-bold text-gray-300">تفاصيل وتلقينات حسابات البيع 📦</h2>
               </div>
 
               {/* Mini Search orders */}
@@ -2541,13 +2573,17 @@ export default function AdminDashboard({
                         <h4 className="text-xs font-bold text-white flex items-center gap-1.5 justify-end">
                           <span>{u.name}</span>
                           <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded ${u.status === 'VIP' ? 'bg-amber-400/20 text-amber-300' : u.status === 'محظور' ? 'bg-red-500/20 text-red-400' : 'bg-cyan-400/20 text-cyan-300'}`}>
-                            {u.status}
+                            {u.status === 'VIP' ? 'VIP ⭐' : u.status === 'محظور' ? 'محظور 🚫' : `${u.status} 🟢`}
                           </span>
                         </h4>
                         <p className="text-[10px] text-gray-400 mt-1">{u.email}</p>
                       </div>
 
-                      <div className="w-10 h-10 rounded-full bg-cyan-400/10 text-cyan-400 text-center font-black flex items-center justify-center border border-cyan-400/20 shrink-0 select-none">
+                      <div className={`w-10 h-10 rounded-full text-center font-black flex items-center justify-center border shrink-0 select-none ${
+                        u.status === 'VIP' ? 'bg-gradient-to-br from-amber-400/25 to-yellow-500/10 text-amber-300 border-amber-400/40 shadow-[0_0_12px_rgba(251,191,36,0.25)]'
+                        : u.status === 'محظور' ? 'bg-gradient-to-br from-red-500/25 to-rose-500/10 text-red-400 border-red-500/40'
+                        : 'bg-gradient-to-br from-cyan-400/25 to-sky-500/10 text-cyan-300 border-cyan-400/30'
+                      }`}>
                         {u.avatarLetter || (u.name ? u.name.charAt(0) : 'ع')}
                       </div>
                     </div>
@@ -2556,7 +2592,7 @@ export default function AdminDashboard({
                   {/* Balance Display */}
                   <div className="flex items-center justify-between text-[11px] bg-slate-950/40 px-3 py-2.5 rounded-xl border border-white/5 font-sans">
                     <span className="font-mono text-cyan-400 font-extrabold text-xs">{Number(u.balance).toLocaleString('en-US')} $</span>
-                    <span className="text-gray-400 font-medium">الرصيد المشحون بالمحفظة</span>
+                    <span className="text-gray-400 font-medium">الرصيد المشحون بالمحفظة 💰</span>
                   </div>
 
                   {/* Inner Credentials Block */}
@@ -2714,7 +2750,7 @@ export default function AdminDashboard({
                 <span className="text-[10px] bg-cyan-400/10 text-cyan-400 px-2.5 py-1 rounded-full font-bold">
                   {conversations.length} غرف دردشة نشطة
                 </span>
-                <h3 className="text-xs font-bold text-gray-300">منظومة الدعم المباشر ومراسلة العملاء المتميزة</h3>
+                <h3 className="text-xs font-bold text-gray-300">منظومة الدعم المباشر ومراسلة العملاء المتميزة 💬</h3>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
@@ -2958,7 +2994,7 @@ export default function AdminDashboard({
                 className="bg-cyan-400 text-slate-950 px-4 py-2.5 rounded-2xl text-xs font-black flex items-center gap-1.5"
                 style={{ display: 'none' }} // Simple anchor
               />
-              <h3 className="text-xs font-bold text-gray-300">بث تحديث وإشعارات فورية للعملاء</h3>
+              <h3 className="text-xs font-bold text-gray-300">بث تحديث وإشعارات فورية للعملاء 📡</h3>
             </div>
 
             <form onSubmit={handleSendBroadcast} className="bg-slate-900/50 border border-white/5 p-4 rounded-3xl space-y-4 text-right">
@@ -3035,7 +3071,7 @@ export default function AdminDashboard({
                 <Plus size={16} />
                 <span>إضافة سلايد عرض جديد</span>
               </button>
-              <h3 className="text-xs font-bold text-gray-300">أشرطة البنرات الإعلانية بالواجهة</h3>
+              <h3 className="text-xs font-bold text-gray-300">أشرطة البنرات الإعلانية بالواجهة 🖼️</h3>
             </div>
 
             <div className="space-y-3">
@@ -3077,7 +3113,7 @@ export default function AdminDashboard({
         {/* 10. TAB: SITE SETTINGS & LOOK */}
         {activeTab === 'settings' && activeSettingsSubTab === 'identity' && (
           <div className="space-y-4">
-            <h3 className="text-xs font-bold text-gray-300">تخصيص هوية وعلامة المتجر بالكامل</h3>
+            <h3 className="text-xs font-bold text-gray-300">تخصيص هوية وعلامة المتجر بالكامل 🎨</h3>
 
             <form onSubmit={saveSettings} className="bg-slate-900/50 border border-white/5 p-4 rounded-3xl space-y-4 text-right text-xs">
               
@@ -3231,7 +3267,7 @@ export default function AdminDashboard({
           <div className="space-y-4">
             
             <div className="bg-slate-900/50 border border-white/5 p-4 rounded-3xl space-y-4 text-right text-xs">
-              <h3 className="text-xs font-black text-white">النسخ الاحتياطي للأمان وحفظ الجداول</h3>
+              <h3 className="text-xs font-black text-white">النسخ الاحتياطي للأمان وحفظ الجداول 💾</h3>
               
               <div className="grid grid-cols-2 gap-2.5">
                 <button
@@ -3258,7 +3294,7 @@ export default function AdminDashboard({
 
             {/* Logs trail */}
             <div className="space-y-2">
-              <h3 className="text-xs font-bold text-gray-300 text-right">سجل الأحداث والعمليات الفنية (Logs)</h3>
+              <h3 className="text-xs font-bold text-gray-300 text-right">سجل الأحداث والعمليات الفنية 📜</h3>
               
               <div className="bg-slate-950 rounded-3xl p-4 h-64 overflow-y-auto no-scrollbar border border-white/5 flex flex-col gap-2">
                 {auditLogs.map((log, idx) => (

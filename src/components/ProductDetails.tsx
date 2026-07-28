@@ -135,7 +135,7 @@ export default function ProductDetails({ product, allProducts, onBack, onAddToCa
 
           <div className="relative z-10 flex justify-between items-start w-full p-6 pb-0">
             <span className="bg-amber-400 text-black font-extrabold text-[9px] px-2 py-0.5 rounded uppercase tracking-widest shadow-lg">
-              {activeProduct.productType === 'account' ? 'حساب معروض للبيع بقوة 🛒' : 'مميز للغاية'}
+              {activeProduct.productType === 'account' ? 'حساب معروض للبيع بقوة 🛒' : 'مميز للغاية 👑'}
             </span>
             {allImages.length > 1 && (
               <span className="bg-slate-905/90 backdrop-blur border border-white/10 text-cyan-400 font-mono text-[10px] px-2 py-0.5 rounded-full font-bold">
@@ -415,7 +415,7 @@ export default function ProductDetails({ product, allProducts, onBack, onAddToCa
       {/* CORE FEATURES LIST */}
       <section className="px-4">
         <div className="glass-card rounded-2xl p-4 space-y-4">
-          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest text-right">أبرز المزايا والمواصفات:</h4>
+          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest text-right">أبرز المزايا والمواصفات ✨:</h4>
           
           <ul className="space-y-3">
             {(activeProduct.features || []).map((feature, index) => (
@@ -448,7 +448,7 @@ export default function ProductDetails({ product, allProducts, onBack, onAddToCa
                 className="flex-1 glass-button text-white hover:text-cyan-400 py-3.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
               >
                 <ShoppingCart size={15} />
-                <span>أضف إلى السلة</span>
+                <span>أضف إلى السلة 🛒</span>
               </motion.button>
               
               <motion.button
@@ -457,7 +457,7 @@ export default function ProductDetails({ product, allProducts, onBack, onAddToCa
                 className="flex-[2] bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-slate-950 py-3.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-400/10 transition-colors cursor-pointer"
               >
                 <CreditCard size={15} />
-                <span>اشتر الآن</span>
+                <span>اشتر الآن ⚡</span>
               </motion.button>
             </>
           )}

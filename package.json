@@ -33,6 +33,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@expo-google-fonts/noto-color-emoji": "^0.4.5",
     "@expo-google-fonts/noto-naskh-arabic": "^0.4.5",
     "@expo-google-fonts/tajawal": "^0.4.1",
     "@playwright/test": "^1.62.0",
