@@ -96,8 +96,8 @@ const steps = {
     // Clear any leftover search text so the target card is visible
     const searchInput = page.getByPlaceholder(/ابحث/);
     if (await searchInput.count()) { await searchInput.fill(''); await sleep(600); }
-    // exact=true avoids hitting the banner headline ("باقة ChatGPT Plus السنوية")
-    const card = page.getByText('ChatGPT Plus', { exact: true }).first();
+    // Open the unified PUBG UC parent card → shows the full tier list (Baly-style)
+    const card = page.getByText(/شدات ببجي PUBG Mobile/).first();
     await card.click({ timeout: 10000 });
     await sleep(1100);
     await snap(page, '04-product-details');
@@ -159,6 +159,13 @@ const steps = {
       await adminNav.click();
       await sleep(1800);
       await snap(page, '10-admin-dashboard');
+      // PUBG UC unified-packs management tab
+      const pubgTab = page.locator('button', { hasText: 'شدات PUBG' }).first();
+      if (await pubgTab.count()) {
+        await pubgTab.click();
+        await sleep(1400);
+        await snap(page, '11-admin-pubg-packs');
+      }
     } else {
       console.log('⚠️  admin tab not visible');
     }

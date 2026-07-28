@@ -1285,6 +1285,85 @@ export default function AdminDashboard({
     return oId.includes(term) || oProdName.includes(term);
   });
 
+  // ─────────────────────────────────────────────────────────────────
+  // UNIFIED PUBG UC GROUPS — packs organized under their parent entry
+  const PUBG_PARENT_ID = 'prod-pubg-parent';
+  const isOrderDoneStatus = (st: string) => st === 'مكتب المشتريات' || st === 'تم تسليم الطلب' || st === 'مكتمل';
+  const packKeysCount = (p: any): number => {
+    try {
+      const arr = Array.isArray(p.keys) ? p.keys : (p.keys ? JSON.parse(p.keys as unknown as string) : []);
+      return arr.length || 0;
+    } catch { return 0; }
+  };
+  const ucTierOf = (name: string): number => {
+    const m = (name || '').replace(/[,،]/g, '').match(/(\d+)\s*UC/i);
+    return m ? parseInt(m[1]) : 0;
+  };
+  const pubgPacksOf = (parentId: string) =>
+    products
+      .filter(p => p.parentId === parentId && p.productType === 'auto_keys' && p.category === 'games')
+      .sort((a, b) => ucTierOf(a.name) - ucTierOf(b.name));
+  const pubgParents = products.filter(p => pubgPacksOf(p.id).length > 0);
+  const standaloneUcPacks = products.filter(p => p.productType === 'auto_keys' && p.category === 'games' && !p.parentId);
+  const ucSoldCountOf = (pid: string): number =>
+    fullOrders
+      .filter(o => o.productId === pid && isOrderDoneStatus(o.status))
+      .reduce((sum, o) => sum + (o.quantity || 1), 0);
+
+  // A single organized pack row: name+tier emoji | price | stock progress | status | edit
+  const renderUcPackRow = (p: any) => {
+    const keysCount = packKeysCount(p);
+    const stockCount = keysCount > 0 ? keysCount : (Number(p.stock) || 0);
+    const soldCount = ucSoldCountOf(p.id);
+    const totalFlow = stockCount + soldCount || 1;
+    const pct = Math.max(3, Math.min(100, Math.round((stockCount / totalFlow) * 100)));
+    const tier = ucTierOf(p.name);
+    const tierEmoji = tier >= 8100 ? '💎' : tier >= 3850 ? '🔥' : tier >= 1320 ? '🚀' : tier >= 660 ? '⚡' : '🎮';
+    const status =
+      stockCount === 0
+        ? { t: 'نفذت ⛔', cls: 'text-red-400 bg-red-500/10 border-red-500/25', bar: 'from-red-400 to-red-600' }
+        : stockCount <= 10
+          ? { t: 'ينفد ⏳', cls: 'text-amber-300 bg-amber-500/10 border-amber-500/25', bar: 'from-amber-300 to-orange-500' }
+          : { t: 'متوفر ✅', cls: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/25', bar: 'from-emerald-300 to-teal-500' };
+
+    return (
+      <div key={p.id} className="bg-slate-950/50 border border-white/5 hover:border-amber-400/25 rounded-2xl p-3 transition-colors">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => handleOpenProductModal(p)}
+              className="p-1.5 hover:bg-white/5 rounded-lg text-yellow-400 border border-white/10 bg-slate-900/60"
+              title="تعديل الباقة"
+            >
+              <Edit size={11} />
+            </button>
+            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full border ${status.cls}`}>{status.t}</span>
+          </div>
+          <div className="text-right flex items-center gap-1.5 min-w-0">
+            <div className="min-w-0">
+              <p className="text-xs font-black text-white truncate">{tier > 0 ? `${tier.toLocaleString('en-US')} شدة` : p.name}</p>
+              <p className="text-[9.5px] font-mono font-bold text-cyan-300 mt-0.5">{(p.price ?? 0).toLocaleString('en-US')} $</p>
+            </div>
+            <span className="text-base shrink-0">{tierEmoji}</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 mt-2">
+          <span className="text-[8.5px] text-gray-500 font-mono shrink-0">{soldCount} مبيعات 🔥</span>
+          <div className="flex-1 bg-white/5 h-1.5 rounded-full overflow-hidden">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${pct}%` }}
+              transition={{ duration: 0.7, ease: 'easeOut' }}
+              className={`h-1.5 rounded-full bg-gradient-to-l ${status.bar}`}
+            />
+          </div>
+          <span className="text-[8.5px] text-gray-400 font-mono shrink-0">{stockCount} كود 🔑</span>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6 pt-2 pb-28 text-white text-right font-sans min-h-screen bg-[#050614]" dir="rtl">
       
@@ -1563,9 +1642,10 @@ export default function AdminDashboard({
                   setProdTypeStep1('charge');
                   setProdProductType('auto_keys');
                   setProdCategory('games');
-                  setProdName('شدات ببجي');
+                  setProdName('شحن شدات ببجي UC');
                   setProdStock('0');
                   setProdCommission('15');
+                  setProdParentId(PUBG_PARENT_ID); // تُضاف تلقائياً تحت المنتج الموحّد
                   setCurrentWizardStep(1);
                   setEditingProduct(null);
                   setActiveModal('product');
@@ -1586,75 +1666,73 @@ export default function AdminDashboard({
               </div>
             </div>
 
-            {/* Inventory Stock Overview Table */}
-            <div className="bg-slate-900/60 border border-white/5 rounded-3xl p-4 overflow-hidden space-y-3">
-              <h3 className="text-xs font-bold text-gray-300 text-right flex items-center justify-end gap-1">
-                  <span>ملخص المخزون ومعدل المبيعات للفئات 📦</span>
-                <Activity size={13} className="text-cyan-400" />
-              </h3>
+            {/* Unified PUBG UC parents — organized pack cards grouped per parent product */}
+            {pubgParents.map((parent) => {
+              const packs = pubgPacksOf(parent.id);
+              const totalKeys = packs.reduce((s, p) => s + packKeysCount(p), 0);
+              const totalSold = packs.reduce((s, p) => s + ucSoldCountOf(p.id), 0);
+              return (
+                <div key={parent.id} className="relative overflow-hidden rounded-3xl border border-amber-400/20 bg-gradient-to-br from-amber-500/10 via-slate-900/70 to-slate-900/60 p-4 space-y-3.5">
+                  <span className="absolute -top-6 -left-6 text-[92px] opacity-[0.07] float-slow select-none pointer-events-none">🎮</span>
 
-              <div className="overflow-x-auto no-scrollbar">
-                <table className="w-full text-right text-xs border-collapse divide-y divide-white/5" dir="rtl">
-                  <thead>
-                    <tr className="text-gray-400 font-bold text-[10px]">
-                      <th className="pb-2.5 text-right">الفئة الرقمية</th>
-                      <th className="pb-2.5 text-center">السعر المعتمد</th>
-                      <th className="pb-2.5 text-center">أكواد في المخزن</th>
-                      <th className="pb-2.5 text-center">أكواد مباعة</th>
-                      <th className="pb-2.5 text-left">حالة توفر المخزون</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {products
-                      .filter(p => p.productType === 'auto_keys' && p.category === 'games')
-                      .map((p) => {
-                        const parsedKeys = Array.isArray(p.keys) ? p.keys : (p.keys ? JSON.parse(p.keys as unknown as string) : []);
-                        const stockCount = parsedKeys.length || p.stock || 0;
-                        
-                        // Calculate sold keys count dynamically based on the fullOrders state
-                        const soldCount = fullOrders
-                          .filter(o => o.productId === p.id && (o.status === 'مكتب المشتريات' || o.status === 'تم تسليم الطلب' || o.status === 'مكتمل'))
-                          .reduce((sum, o) => sum + (o.quantity || 1), 0);
+                  {/* Parent header */}
+                  <div className="flex items-start justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenProductModal(parent as any)}
+                      className="p-2 hover:bg-white/5 rounded-xl text-yellow-400 border border-white/10 bg-slate-950/40 shrink-0"
+                      title="تعديل المنتج الأب الموحّد"
+                    >
+                      <Edit size={13} />
+                    </button>
+                    <div className="text-right">
+                      <h3 className="text-sm font-black text-white flex items-center gap-1.5 justify-end">
+                        <span>المنتج الموحّد — كل الباقات في صفحة واحدة 🎯</span>
+                      </h3>
+                      <p className="text-[10px] text-amber-300/80 mt-0.5">{parent.name}</p>
+                    </div>
+                  </div>
 
-                        let statusBadge = (
-                          <span className="text-[9px] font-bold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/10">نشط ومتوفر ✅</span>
-                        );
-                        if (stockCount === 0) {
-                          statusBadge = (
-                            <span className="text-[9px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/10">نفذت الكمية 🔴</span>
-                          );
-                        } else if (stockCount <= 10) {
-                          statusBadge = (
-                            <span className="text-[9px] font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/10">ينفد قريباً ⚠️</span>
-                          );
-                        }
+                  {/* Stats chips */}
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-slate-950/50 border border-white/5 rounded-xl py-2">
+                      <p className="text-sm font-black text-white">{packs.length}</p>
+                      <span className="text-[8.5px] text-gray-400">باقة 🎁</span>
+                    </div>
+                    <div className="bg-slate-950/50 border border-white/5 rounded-xl py-2">
+                      <p className="text-sm font-black text-emerald-300">{totalKeys}</p>
+                      <span className="text-[8.5px] text-gray-400">كود متوفر 🔑</span>
+                    </div>
+                    <div className="bg-slate-950/50 border border-white/5 rounded-xl py-2">
+                      <p className="text-sm font-black text-amber-300">{totalSold}</p>
+                      <span className="text-[8.5px] text-gray-400">كود مباع 🔥</span>
+                    </div>
+                  </div>
 
-                        return (
-                          <tr key={p.id} className="hover:bg-white/2 transition">
-                            <td className="py-3 font-bold text-white text-right">
-                              <div className="flex items-center gap-2 justify-start">
-                                {p.imageUrl && <img src={p.imageUrl} className="w-6 h-6 rounded-md object-cover" referrerPolicy="no-referrer" />}
-                                <span>{p.name}</span>
-                              </div>
-                            </td>
-                            <td className="py-3 text-center font-mono font-bold text-cyan-400">{(p.price ?? 0).toLocaleString('en-US')} $</td>
-                            <td className="py-3 text-center font-mono font-extrabold text-white">{stockCount} كود</td>
-                            <td className="py-3 text-center font-mono text-gray-400">{soldCount} كود مباع</td>
-                            <td className="py-3 text-left">{statusBadge}</td>
-                          </tr>
-                        );
-                      })}
-                    {products.filter(p => p.productType === 'auto_keys' && p.category === 'games').length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="py-8 text-center text-gray-400 text-xs">
-                          لا تتوفر أي فئات لـ شدات PUBG UC حالياً. اضغط "إضافة فئة شدات جديدة" بالاعلى.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                  {/* Pack rows */}
+                  <div className="space-y-2">
+                    {packs.map((p) => renderUcPackRow(p))}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Standalone UC packs (not attached to any parent) */}
+            {standaloneUcPacks.length > 0 && (
+              <div className="bg-slate-900/60 border border-white/5 rounded-3xl p-4 space-y-3">
+                <h3 className="text-xs font-bold text-gray-300 text-right flex items-center justify-end gap-1">
+                  <span>فئات شدات مستقلة أخرى 📦</span>
+                  <Activity size={13} className="text-cyan-400" />
+                </h3>
+                <div className="space-y-2">{standaloneUcPacks.map((p) => renderUcPackRow(p))}</div>
               </div>
-            </div>
+            )}
+
+            {pubgParents.length === 0 && standaloneUcPacks.length === 0 && (
+              <div className="py-10 text-center text-gray-400 text-xs bg-slate-900/30 border border-white/5 rounded-3xl">
+                لا تتوفر أي فئات لـ شدات PUBG UC حالياً 🎮 اضغط "إضافة فئة شدات جديدة ⚡" بالأعلى.
+              </div>
+            )}
 
             {/* Bulk Keys Stocker Form Panel */}
             <div className="bg-slate-900/60 border border-white/5 rounded-3xl p-5 text-right space-y-4">

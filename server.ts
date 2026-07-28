@@ -632,6 +632,56 @@ async function initDatabase() {
       }
     }
 
+    // ── UNIFIED PUBG UC PARENT ────────────────────────────────────────────────
+    // One storefront entry — the customer opens it and picks a UC tier
+    // (60 / 325 / 660 / 1320 / 1800 / 3850 / 8100) from a single clean list.
+    const pubgPackIds = ['prod-pubg-60', 'prod-pubg-325', 'prod-pubg', 'prod-pubg-1320', 'prod-pubg-1800', 'prod-pubg-3850', 'prod-pubg-8100'];
+
+    const pubgParentCheck = await db.execute({
+      sql: "SELECT COUNT(*) as count FROM rx_products WHERE id = ?",
+      args: [PUBG_PARENT_ID]
+    });
+    if (Number(pubgParentCheck.rows[0].count) === 0) {
+      console.log('Seeding unified PUBG UC parent product...');
+      await db.execute({
+        sql: `INSERT INTO rx_products (id, name, category, price, originalPrice, period, stock, imageUrl, iconName, rating, reviewsCount, features, gradientClass, commission_rate, productType, keys, tagText)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          PUBG_PARENT_ID,
+          'شدات ببجي PUBG Mobile 🎮',
+          'games',
+          4.50,
+          6.00,
+          '7 باقات متنوعة — اختر شداتك ⚡',
+          0,
+          'https://lh3.googleusercontent.com/aida-public/AB6AXuDDOSlnh8_DPFEpa-9U-o7j8A3KJE0PX-N1_Cv5_qO-VWn-gGvaByaflsoqHrh0m7YqJJP8_savJuHifuxTTHztb8xSFmC_Lfm1WOt0vIRXy6FoPHjjYb_kl534Im_VX-0-m3MLNIdnxu2oGeO9Yf9xA3u-DyU4y3hcDjzRMyyWcm8alN9ssrQ1VafKDmckIxzl29R8IGAhf-IFwiK_xY_cLWR3cGA1kCHnKmjVB47Zq-FqFV4-kvON1h1RtP6RX08K0FEKDzMg6mkb',
+          'gamepad-2',
+          4.9,
+          5240,
+          JSON.stringify([
+            'اختر الباقة المناسبة لك من 7 فئات متنوعة ⚡',
+            'شحن رسمي وفوري مباشر عبر الايدي (ID)',
+            'تفعيل فوري عبر موقع Midasbuy الرسمي لـ PUBG MOBILE',
+            'ضمان رسمي موثوق مائة بالمائة على كل باقة 🛡️'
+          ]),
+          null,
+          8,
+          'standard',
+          JSON.stringify([]),
+          'كل الباقات ⚡'
+        ]
+      });
+    }
+
+    // Attach every UC tier to the unified parent (idempotent migration for old databases)
+    for (const packId of pubgPackIds) {
+      await db.execute({
+        sql: "UPDATE rx_products SET parentId = ? WHERE id = ? AND (parentId IS NULL OR parentId != ?)",
+        args: [PUBG_PARENT_ID, packId, PUBG_PARENT_ID]
+      });
+    }
+    await syncParentStock(PUBG_PARENT_ID);
+
     // 3. Seed Users
     const userCheck = await db.execute("SELECT COUNT(*) as count FROM rx_users");
     const userCount = Number(userCheck.rows[0].count);
@@ -748,6 +798,31 @@ async function initDatabase() {
 
 initDatabase();
 
+// Unified PUBG UC parent id — all UC tiers live under it as sub-products (one storefront entry)
+const PUBG_PARENT_ID = 'prod-pubg-parent';
+
+// Keep a parent product's stock equal to the combined live stock of all its sub-products
+async function syncParentStock(parentId: string): Promise<void> {
+  if (!parentId) return;
+  try {
+    const subs = await db.execute({
+      sql: "SELECT stock, keys FROM rx_products WHERE parentId = ?",
+      args: [parentId]
+    });
+    let total = 0;
+    subs.rows.forEach((r: any) => {
+      const k = ensureArray(r.keys);
+      total += k.length > 0 ? k.length : (Number(r.stock) || 0);
+    });
+    await db.execute({
+      sql: "UPDATE rx_products SET stock = ? WHERE id = ?",
+      args: [total, parentId]
+    });
+  } catch (e) {
+    console.error("syncParentStock error:", e);
+  }
+}
+
 // Helper to safely normalize and parse values into a clean array of strings/items (handling double stringified values)
 function ensureArray(val: any): any[] {
   if (val === undefined || val === null) return [];
@@ -859,6 +934,7 @@ app.post("/api/products", async (req, res) => {
         parentId || ""
       ]
     });
+    if (parentId) await syncParentStock(String(parentId));
     res.json({ success: true, message: "Product created" });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -899,6 +975,7 @@ app.put("/api/products/:id", async (req, res) => {
         id
       ]
     });
+    if (parentId) await syncParentStock(String(parentId));
     res.json({ success: true, message: "Product updated" });
   } catch (error: any) {
     res.status(505).json({ error: error.message });
@@ -1624,6 +1701,11 @@ app.post("/api/orders", async (req, res) => {
           sql: "UPDATE rx_products SET stock = stock - ? WHERE id = ?",
           args: [Number(quantity) || 1, String(dbProduct.id)]
         });
+      }
+
+      // Keep the unified parent product stock = sum of all its pack stocks
+      if (dbProduct.parentId) {
+        await syncParentStock(String(dbProduct.parentId));
       }
 
       // Insert Order record

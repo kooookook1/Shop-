@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, ChevronRight, Star, Check, Sparkles, Brain, Tv, Music, Palette, Smartphone, Shield, ShoppingCart, CreditCard } from 'lucide-react';
+import { ArrowRight, ChevronRight, ChevronLeft, Star, Check, Sparkles, Brain, Tv, Music, Palette, Smartphone, Shield, ShoppingCart, CreditCard, Zap } from 'lucide-react';
 import { Product } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -19,6 +19,14 @@ export default function ProductDetails({ product, allProducts, onBack, onAddToCa
   const [heroImgError, setHeroImgError] = useState(false);
 
   const subProducts = allProducts ? allProducts.filter(p => p.parentId === product.id) : [];
+
+  // Extract the UC amount from a pack name (e.g. "شحن شدات ببجي 8100UC" -> 8100) for clean sorting & display
+  const ucAmountOf = (name: string) => {
+    const m = (name || '').replace(/[,،]/g, '').match(/(\d+)\s*UC/i);
+    return m ? parseInt(m[1]) : 0;
+  };
+  // Packs always sorted from the smallest tier to the biggest (like top-up apps)
+  const sortedSubProducts = [...subProducts].sort((a, b) => ucAmountOf(a.name) - ucAmountOf(b.name));
 
   const [activeProduct, setActiveProduct] = useState<Product>(() => {
     return subProducts.length > 0 ? subProducts[0] : product;
@@ -200,53 +208,103 @@ export default function ProductDetails({ product, allProducts, onBack, onAddToCa
         )}
       </section>
 
-      {/* NESTED PACKAGES SELECTOR */}
+      {/* UC PACKS SELECTOR — one product, all tiers in a single clean list (Baly-style) */}
       {subProducts.length > 0 && (
         <section className="px-4 space-y-3">
-          <div className="glass-card rounded-2xl p-4 border border-cyan-500/20 shadow-lg shadow-cyan-500/5 space-y-3">
-            <h4 className="text-xs font-bold text-cyan-400 text-right uppercase tracking-wider">
-              اختر العرض أو الفئة الفرعية الشحن:
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[10px] font-black bg-amber-400/10 text-amber-300 border border-amber-400/25 px-2.5 py-1 rounded-full">
+              {subProducts.length} باقات متوفرة 🎁
+            </span>
+            <h4 className="text-sm font-black text-white flex items-center gap-1.5">
+              <span>اختر الباقة المناسبة لك</span>
+              <Zap size={14} className="text-amber-400 fill-amber-400" />
             </h4>
-            <div className="grid grid-cols-2 gap-2.5">
-              {subProducts.map((sub) => {
-                const isSelected = activeProduct.id === sub.id;
-                const isOutOfStock = sub.stock === 0 || (sub.productType === 'auto_keys' && (!sub.keys || sub.keys.length === 0));
-                
-                return (
-                  <button
-                    key={sub.id}
-                    type="button"
-                    onClick={() => {
-                      setActiveProduct(sub);
-                      setImageIndex(0); // Reset image gallery on subproduct switch if needed
-                    }}
-                    className={`relative p-3 rounded-xl border text-right transition-all flex flex-col justify-between h-20 ${
-                      isSelected 
-                        ? 'border-cyan-400 bg-cyan-400/10 shadow-[0_0_12px_rgba(34,211,238,0.2)]' 
-                        : 'border-white/5 bg-slate-900/60 hover:border-white/20'
-                    }`}
-                  >
-                    <div className="space-y-0.5">
-                      <span className={`text-[11px] font-bold block ${isSelected ? 'text-white' : 'text-gray-300'}`}>
-                        {sub.name}
-                      </span>
+          </div>
+
+          <div className="space-y-2">
+            {sortedSubProducts.map((sub, idx) => {
+              const isSelected = activeProduct.id === sub.id;
+              const keysCount = Array.isArray(sub.keys) ? sub.keys.length : 0;
+              const isOutOfStock = sub.stock === 0 || (sub.productType === 'auto_keys' && keysCount === 0);
+              const discount = sub.originalPrice && sub.originalPrice > sub.price
+                ? Math.max(1, Math.round((1 - sub.price / sub.originalPrice) * 100))
+                : 0;
+              const ucAmount = ucAmountOf(sub.name);
+              const tierEmoji = ucAmount >= 8100 ? '💎' : ucAmount >= 3850 ? '🔥' : ucAmount >= 1320 ? '🚀' : ucAmount >= 660 ? '⚡' : '🎮';
+
+              return (
+                <motion.button
+                  key={sub.id}
+                  type="button"
+                  initial={{ opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05, duration: 0.3, ease: 'easeOut' }}
+                  whileTap={!isOutOfStock ? { scale: 0.985 } : undefined}
+                  onClick={() => {
+                    if (isOutOfStock) return;
+                    setActiveProduct(sub);
+                    setImageIndex(0);
+                  }}
+                  className={`w-full relative overflow-hidden rounded-2xl border p-3.5 flex items-center justify-between gap-3 text-right transition-all duration-300 ${
+                    isSelected
+                      ? 'border-cyan-300 bg-gradient-to-l from-cyan-400/15 via-cyan-400/5 to-transparent shadow-[0_0_22px_rgba(34,211,238,0.22)]'
+                      : isOutOfStock
+                        ? 'border-white/5 bg-slate-950/50 opacity-55 cursor-not-allowed'
+                        : 'bg-slate-900/70 border-white/10 hover:border-cyan-400/40 hover:bg-slate-900/90 cursor-pointer'
+                  }`}
+                >
+                  {/* RIGHT SIDE: pack name + stock */}
+                  <div className="text-right space-y-1.5 min-w-0">
+                    <p className={`text-[13px] font-black flex items-center gap-1.5 justify-end ${isSelected ? 'text-white' : 'text-gray-100'}`}>
+                      <span>{ucAmount > 0 ? `${ucAmount.toLocaleString('en-US')} شدة` : sub.name}</span>
+                      <span className="text-sm">{tierEmoji}</span>
+                    </p>
+                    <div className="flex items-center justify-end gap-2">
                       {isOutOfStock ? (
-                        <span className="text-[9px] text-[#ef4444] font-medium bg-red-500/10 px-1.5 py-0.2 rounded-full border border-red-500/15">نفذت الكمية</span>
+                        <span className="text-[9px] font-black text-red-300 bg-red-500/15 px-2 py-0.5 rounded-full border border-red-500/30">نفذت الكمية ⛔</span>
+                      ) : keysCount > 0 ? (
+                        <span className="text-[9px] font-black text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/25">
+                          متوفر {keysCount} كود 🔑 تسليم فوري
+                        </span>
                       ) : (
-                        <span className="text-[9px] text-[#10b981] font-medium bg-emerald-500/10 px-1.5 py-0.2 rounded-full border border-emerald-500/15">متاح فورا</span>
+                        <span className="text-[9px] font-black text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/25">متاح فوراً ✅</span>
                       )}
                     </div>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-[10px] text-gray-400">السعر:</span>
-                      <span className="text-xs font-black text-cyan-300">
-                        {sub.price.toLocaleString('en-US')} <span className="text-[9.5px] font-bold">$</span>
-                      </span>
+                  </div>
+
+                  {/* LEFT SIDE: price + discount + chevron/check */}
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    <div className="text-left space-y-1">
+                      <p className="flex items-baseline gap-1.5 justify-end" dir="ltr">
+                        {sub.originalPrice && sub.originalPrice > sub.price && (
+                          <span className="text-[9.5px] text-gray-500 line-through font-semibold">{sub.originalPrice.toLocaleString('en-US')}</span>
+                        )}
+                        <span className={`text-sm font-black ${isSelected ? 'text-cyan-200 drop-shadow-[0_0_8px_rgba(34,211,238,0.4)]' : 'text-cyan-300'}`}>
+                          {sub.price.toLocaleString('en-US')} <span className="text-[9px] text-gray-400 font-bold">$</span>
+                        </span>
+                      </p>
+                      {discount > 0 && (
+                        <span className="inline-block text-[8.5px] font-black bg-gradient-to-l from-sky-500 to-blue-600 text-white px-2 py-0.5 rounded-full shadow-md shadow-blue-500/25">
+                          أقل بنسبة {discount}% 🔥
+                        </span>
+                      )}
                     </div>
-                  </button>
-                );
-              })}
-            </div>
+                    <span className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all ${
+                      isSelected
+                        ? 'bg-gradient-to-br from-cyan-300 to-sky-500 text-slate-950 shadow-lg shadow-cyan-400/30'
+                        : 'bg-white/5 border border-white/10 text-gray-400'
+                    }`}>
+                      {isSelected ? <Check size={14} strokeWidth={3.5} /> : <ChevronLeft size={14} />}
+                    </span>
+                  </div>
+                </motion.button>
+              );
+            })}
           </div>
+
+          <p className="text-[9.5px] text-gray-500 text-center pt-0.5">
+            💡 الأسعار مرتبة من الأصغر للأكبر — كل باقة لها أكوادها المستقلة وتسليمها الفوري
+          </p>
         </section>
       )}
 
