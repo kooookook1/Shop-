@@ -12,3 +12,9 @@ coverage/
 *.db-journal
 *.db-wal
 *.db-shm
+
+# Dev-tooling artifacts
+screenshots/
+test-results/
+playwright-report/
+baseline/

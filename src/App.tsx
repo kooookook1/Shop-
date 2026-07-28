@@ -530,9 +530,29 @@ export default function App() {
     }
   };
 
+  // Toast overlay element — shared by the auth gate and the main app so that
+  // login/registration errors (wrong password, duplicate email, ...) are
+  // actually rendered instead of being swallowed by the early return below.
+  const toastOverlay = (
+    <AnimatePresence>
+      {toastMessage && (
+        <Notification
+          message={toastMessage}
+          type={toastType === 'success' ? 'success' : 'error'}
+          onClose={() => setToastMessage(null)}
+        />
+      )}
+    </AnimatePresence>
+  );
+
   // Authentication gating
   if (!isLoggedIn) {
-    return <LoginScreen onLogin={handleLogin} />;
+    return (
+      <>
+        {toastOverlay}
+        <LoginScreen onLogin={handleLogin} />
+      </>
+    );
   }
 
   const activeUserId = currentUserObj?.id || users.find(u => u.name === currentUser || u.email === currentUserObj?.email || u.id === currentUser)?.id || currentUser || 'guest_user';
@@ -542,15 +562,7 @@ export default function App() {
     <div className="flex flex-col min-h-screen bg-[#050614] text-white selection:bg-cyan-400 selection:text-slate-950 select-none">
       
       {/* Toast Alert overlay notifications */}
-      <AnimatePresence>
-        {toastMessage && (
-          <Notification 
-            message={toastMessage} 
-            type={toastType === 'success' ? 'success' : 'error'} 
-            onClose={() => setToastMessage(null)} 
-          />
-        )}
-      </AnimatePresence>
+      {toastOverlay}
 
       {/* Main app panel flow container */}
       <div className="flex-1 w-full max-w-md mx-auto relative bg-[#050614] flex flex-col justify-between">
