@@ -18,3 +18,6 @@ screenshots/
 test-results/
 playwright-report/
 baseline/
+
+# Published showcase screenshots stay tracked
+!docs/screenshots/
