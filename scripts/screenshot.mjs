@@ -33,30 +33,33 @@ async function snap(page, name) {
   console.log(`📸 ${name}.png`);
 }
 
+async function login(page, { email, password }) {
+  await page.locator('input[type="email"]').fill(email);
+  await page.locator('input[type="password"]').fill(password);
+  // Wait for the email-exists blur check to settle so the button isn't disabled mid-flight
+  await sleep(800);
+  await page.locator('button[type="submit"]').click();
+  await sleep(2500);
+}
+
 async function register(page, { name, email, password }) {
-  await page.goto(BASE_URL, { waitUntil: 'networkidle' }).catch(() => {});
+  await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' }).catch(() => {});
   await page.evaluate(() => localStorage.clear());
-  await page.reload({ waitUntil: 'networkidle' }).catch(() => {});
-  // Switch to registration
+  await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+  await page.locator('input[type="email"]').waitFor({ timeout: 20000 });
+
+  // Try login first — the account may already exist from an earlier run
+  await login(page, { email, password });
+  const loggedIn = await page.evaluate(() => localStorage.getItem('rixon_is_logged_in') === 'true');
+  if (loggedIn) return;
+
+  // Not registered yet → switch to registration mode and sign up
   const regLink = page.locator('button', { hasText: 'إنشاء حساب جديد' }).last();
   if (await regLink.count()) await regLink.click();
   await sleep(400);
   const nameInput = page.locator('input[placeholder="الاسم الكامل"]');
   if (await nameInput.count()) await nameInput.fill(name);
-  await page.locator('input[type="email"]').fill(email);
-  await page.locator('input[type="password"]').fill(password);
-  await page.locator('button[type="submit"]').click();
-  await sleep(2500); // artificial auth delay + fetch
-}
-
-async function loginUser(page) {
-  await page.goto(BASE_URL, { waitUntil: 'networkidle' }).catch(() => {});
-  await page.evaluate(() => localStorage.clear());
-  await page.reload({ waitUntil: 'networkidle' }).catch(() => {});
-  await page.locator('input[type="email"]').fill(USER.email);
-  await page.locator('input[type="password"]').fill(USER.password);
-  await page.locator('button[type="submit"]').click();
-  await sleep(2500);
+  await login(page, { email, password });
 }
 
 async function giveBalance(page, amount = 500) {
@@ -90,9 +93,13 @@ const steps = {
   },
 
   product: async page => {
+    // Clear any leftover search text so the target card is visible
+    const searchInput = page.getByPlaceholder('ابحث...');
+    if (await searchInput.count()) { await searchInput.fill(''); await sleep(600); }
     // exact=true avoids hitting the banner headline ("باقة ChatGPT Plus السنوية")
     const card = page.getByText('ChatGPT Plus', { exact: true }).first();
-    if (await card.count()) { await card.click(); await sleep(1100); }
+    await card.click({ timeout: 10000 });
+    await sleep(1100);
     await snap(page, '04-product-details');
     const back = page.locator('button', { hasText: 'الرجوع للمتجر' }).first();
     if (await back.count()) { await back.click().catch(() => {}); await sleep(500); }
@@ -133,11 +140,12 @@ const steps = {
   support: async page => {
     await page.locator('nav button', { hasText: 'الدعم' }).click();
     await sleep(800);
-    const quickMsg = page.locator('input[placeholder*="رسالة"], textarea').first();
-    if (await quickMsg.count()) {
-      await quickMsg.fill('مرحباً، وين ألقى طلبي؟');
-      await page.keyboard.press('Enter');
-      await sleep(1500);
+    const input = page.getByPlaceholder('اكتب رسالتك للدعم الفني...');
+    if (await input.count()) {
+      await input.fill('مرحباً، وين ألقى طلبي؟');
+      // The send button is the cyan square next to the input
+      await page.locator('button:has(svg.lucide-send)').first().click().catch(() => page.keyboard.press('Enter'));
+      await sleep(2200); // bot auto-reply round-trip
     }
     await snap(page, '09-support-chat');
   },
